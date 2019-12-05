@@ -6,6 +6,7 @@
 # SES ignore files
 Output/
 *.emSession
+code/pca10056/blank/ses/libuarte_pca10056.emSession
 
 # For PCBs designed using KiCad: http://www.kicad-pcb.org/
 # Format documentation: http://kicad-pcb.org/help/file-formats/

@@ -12,19 +12,27 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <bsp.h>
 
+#include "boards.h"
+#include "bsp.h"
+
+#include "app_timer.h"
 #include "nrf_drv_clock.h"
 #include "nrf_delay.h"
 #include "nrf_drv_power.h"
-#include "app_timer.h"
 
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
-#include "boards.h"
 #include "iotublox.h"
+
+//https://devzone.nordicsemi.com/nordic/short-range-guides/b/software-development-kit/posts/application-timer-tutorial
+#if NRF_PWR_MGMT_CONFIG_USE_SCHEDULER
+#include "app_scheduler.h"
+#define APP_SCHED_MAX_EVENT_SIZE    0   /**< Maximum size of scheduler events. */
+#define APP_SCHED_QUEUE_SIZE        4   /**< Maximum number of events in the scheduler queue. */
+#endif // NRF_PWR_MGMT_CONFIG_USE_SCHEDULER
 
 static void sleep_handler(void)
 {
@@ -38,6 +46,11 @@ static void sleep_handler(void)
  */
 int main(void)
 {
+    ret_code_t err_code = NRF_LOG_INIT(app_timer_cnt_get);
+    APP_ERROR_CHECK(err_code);
+
+    NRF_LOG_DEFAULT_BACKENDS_INIT();
+
     bsp_board_init(BSP_INIT_LEDS);
 
     nrf_gpio_cfg_input(ARDUINO_6_PIN, NRF_GPIO_PIN_PULLUP);   // SW3, user button
@@ -45,15 +58,21 @@ int main(void)
     nrf_gpio_cfg_input(BUTTON_2, NRF_GPIO_PIN_PULLUP);        // EVK button
     nrf_gpio_cfg_output(ARDUINO_A1_PIN);                      // PWR_ON Pin, active High
     
+    // Function starting the internal low-frequency clock LFCLK XTAL oscillator.
+    // (When SoftDevice is enabled the LFCLK is always running and this is not needed).
     ret_code_t ret = nrf_drv_clock_init();
     APP_ERROR_CHECK(ret);
-  
     nrf_drv_clock_lfclk_request(NULL);
 
-    ret_code_t err_code = NRF_LOG_INIT(app_timer_cnt_get);
-    APP_ERROR_CHECK(err_code);
+    ret = app_timer_init();
+    APP_ERROR_CHECK(ret);
 
-    NRF_LOG_DEFAULT_BACKENDS_INIT();
+#if NRF_PWR_MGMT_CONFIG_USE_SCHEDULER
+    APP_SCHED_INIT(APP_SCHED_MAX_EVENT_SIZE, APP_SCHED_QUEUE_SIZE);
+#endif // NRF_PWR_MGMT_CONFIG_USE_SCHEDULER
+
+    //ret = nrf_pwr_mgmt_init();
+    APP_ERROR_CHECK(ret);
 
     uart_init();
 
@@ -64,11 +83,15 @@ int main(void)
 
     uart_write(welcome);
 
-    iotublox_init(100, 8, 524420);
+    iotublox_init(100, 8, 524420, 524420);
     iotublox_connect("lpwa.telia.iot");
 
     while (true)
     {
+    #if NRF_PWR_MGMT_CONFIG_USE_SCHEDULER
+        app_sched_execute();
+    #endif // NRF_PWR_MGMT_CONFIG_USE_SCHEDULER
+
         if( !nrf_gpio_pin_read(BUTTON_2) )
         {
           NRF_LOG_INFO("uart_available: %i", uart_available());

@@ -13,6 +13,10 @@
 
 - [ ] More details about battery etc...
 
+## Amazon AWS and MQTT
+
+https://docs.aws.amazon.com/iot/latest/developerguide/iot-gs.html
+
 ## Running the code locally
 
 https://devzone.nordicsemi.com/f/nordic-q-a/44638/how-to-move-an-sdk-example-out-of-the-sdk-tree

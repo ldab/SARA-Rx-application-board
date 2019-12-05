@@ -35,25 +35,32 @@ extern "C" {
   #define AT_BUFFER 64
 #endif
 
-#define MODEM_MUX_COUNT 7
 #define MODEM_TIMEOUT   1000L
 
 // May want to use PROGMEM
-#define NL_CHAR "\r"
+#define NL_CHAR "\r\n"
 static char R_OK[]        = "OK" NL_CHAR;
 static char R_ERROR[]     = "ERROR" NL_CHAR;
-static char R_CME_ERROR[] = NL_CHAR "+CME ERROR:";
+static char R_CME_ERROR[] = "+CME ERROR: " ;//TODO NL_CHAR check if before
 
 #define YIELD() nrf_delay_us(0)
 
+typedef struct {
+    uint8_t   identifier;
+    uint16_t  length;
+    char*     content;
+    bool      connected;
+} socket_t;
+
+socket_t socket;
+
 typedef const char* ModemConstStr;
 
-char *greetingText = "\"Hello World\"";
+char *greetingText = "Hello World";
 char* serverAdress;
 bool _isConnected = false;
 unsigned char clientBuf[1500] = "";
 
-bool streamSkipUntil(const char c, const unsigned long timeout_ms);
 char* readStringUntil(char terminator);
 uint32_t millis(void);
 void reboot(void);
@@ -81,19 +88,26 @@ uint8_t waitResponse(uint32_t timeout_ms, char* data)
     {
       YIELD();
 
-      resp[strlen(resp)] = uart_read();     
+      resp[strlen(resp)] = uart_read();
+      
+      // Remove leading \r and \n for pretty NRF_LOF_INFO
+      if(resp[0] == '\r' && resp[1] == '\n') 
+      {
+        memset(resp, '\0', sizeof(resp));
+        resp[strlen(resp)] = uart_read();
+      }
 
-      if(strcmp(resp, data) == 0){
+        if(strstr(resp, data) != NULL){
         index = 1;
         goto finish;
-      } else if (strcmp(resp, r2) == 0) {
+      } else if (strstr(resp, r2) != NULL) {
         index = 2;
         goto finish;
-      } else if (strcmp(resp, r3) == 0) {
+      } else if (strstr(resp, r3) != NULL) {
         index = 3;
-        if (r3 == R_CME_ERROR) {
-          streamSkipUntil('\n', MODEM_TIMEOUT);  //TODO // Read out the error
-        }
+        // OR memcpy(resp, _buff, MODEM_RX_BUFFER);
+        //strncpy(resp, _buff, MODEM_RX_BUFFER);
+        strcat(resp, readStringUntil('\r'));
         goto finish;
       } else if (strcmp(resp, r4) == 0) {
         index = 4;
@@ -101,63 +115,37 @@ uint8_t waitResponse(uint32_t timeout_ms, char* data)
       } else if (strcmp(resp, r5) == 0) {
         index = 5;
         goto finish;
-      } else if (strcmp(resp,"+UUSORD: ") == 0) {
-        uint8_t socket = atoi(readStringUntil(','));
-        uint8_t length = atoi(readStringUntil('\n'));
-        // TODO DATA IS AVAILABLE READ IT
-        /*
-        if (mux >= 0 && mux < MODEM_MUX_COUNT && sockets[mux]) {
-          sockets[mux]->got_data = true;
-          sockets[mux]->sock_available = length;
-        }*/
-        NRF_LOG_INFO("### URC Data Received: %i on %i", length, socket);
-      } else if (strcmp(resp,"+UUSOCL: ") == 0) {
-        uint8_t socket = atoi(readStringUntil('\n'));
-        /*
-        if (mux >= 0 && mux < MODEM_MUX_COUNT && sockets[mux]) {
-          RAISE FLAG
-          sockets[mux]->sock_connected = false;
-        }*/
-        NRF_LOG_INFO("### URC Sock Closed: %i", socket);
+      } else if (strstr(resp, "+UUSORD: ") != NULL) {
+        socket.identifier = atoi(readStringUntil(','));
+        socket.length     = atoi(readStringUntil('\r'));
+        NRF_LOG_INFO("### URC Data Received: %i on %i", socket.length, socket.identifier);
+      } else if (strstr(resp, "+UUSOCL: ") != NULL) {
+        uint8_t _s = atoi(readStringUntil('\r'));
+        socket.content = false;
+        NRF_LOG_INFO("### URC Sock Closed: %i", _s);
       }
     }
   } while ((millis() - startMillis ) < timeout_ms);
-  
+
   finish:
 
   if (!index) {
     if (strlen(resp)){
       NRF_LOG_INFO("### Unhandled: %s", resp);
+      NRF_LOG_FLUSH();
+    }else{
+      NRF_LOG_INFO("### TIMEOUT");
+      NRF_LOG_FLUSH();
     }
     uart_clear();
   }
+  else{
+    //NRF_LOG_INFO("<- %.*s", strlen(resp)-1, resp); TODO Remove \n from the end
+    NRF_LOG_INFO("<- %s", resp);
+    NRF_LOG_FLUSH();
+  }
 
   return index;
-}
-
-/**
-* @brief Function for skipping and find Char
-*
-* @param c  Char to find.
-*
-* @return True when found.
-* */
-bool streamSkipUntil(const char c, const unsigned long timeout_ms)
-{
-  unsigned long startMillis = millis();
-  while (millis() - startMillis < timeout_ms) 
-  {
-    while (uart_available())
-    {
-      YIELD();
-      char _c = uart_read();
-      if (_c == c)
-      {
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 /**
@@ -169,14 +157,17 @@ bool streamSkipUntil(const char c, const unsigned long timeout_ms)
 * */
 char *readStringUntil(char terminator)
 {
-  // TODO ADD TIMEOUT
-  char *_ret = (char*)calloc(64, sizeof(char));
+  char *_ret = (char*)calloc(MODEM_RX_BUFFER, sizeof(char));
+  unsigned long startMillis = millis();
   
-  do{
-    _ret[strlen(_ret)] = uart_read();
-  }while (_ret[strlen(_ret)-1] >= 0 && _ret[strlen(_ret)-1] != terminator);
+  while ((millis() - startMillis) < MODEM_TIMEOUT)
+  {
+      _ret[strlen(_ret)] = uart_read();
+      if(_ret[strlen(_ret)-1] == terminator) break;
+  }
 
-  uart_clear();   // Flush uart to remove OK from buffer
+  if( terminator != ',' )
+    uart_clear();   // Flush uart to remove OK from buffer
 
   return _ret;
   
@@ -191,9 +182,10 @@ uint32_t millis(void)
 
   uint64_t ticks = (uint64_t)((uint64_t)overflows << (uint64_t)24) | (uint64_t)(NRF_RTC1->COUNTER);
 
-  return (ticks * 1000) / 32768;
+  return (ticks * 1000) / 16384;
 
   //return app_timer_cnt_get() / 32.768;
+  //return (uint32_t)app_timer_cnt_get() / 16.384;
 }
 
 /**
@@ -220,18 +212,18 @@ void sendAT(char* arg)
 *
 * @return True if success.
 * */
-bool iotublox_init(uint8_t mnoProf, uint8_t rat, uint64_t bandMask)
+bool iotublox_init(uint8_t mnoProf, uint8_t rat, uint64_t bandMask0, uint64_t bandMask1)
 {
   sendAT("E0");                      // Echo Off.
   if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
   
   char command[AT_BUFFER] = "";
-  sprintf(command, "+CSGT=1,%s", greetingText);
+  sprintf(command, "+CSGT=1,\"%s\"", greetingText);
   sendAT(command);
-  //if (waitResponse(1000L, R_OK) != 1) return false;
+  if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
 
   sendAT("+UMNOPROF?");                           // Check MNO Profile.
-  waitResponse(MODEM_TIMEOUT, "+UMNOPROF: ");
+  if (waitResponse(MODEM_TIMEOUT, "+UMNOPROF: ") != 1) return false;
 
   uint8_t _mno = atoi(readStringUntil('\r'));
 
@@ -249,23 +241,29 @@ bool iotublox_init(uint8_t mnoProf, uint8_t rat, uint64_t bandMask)
       reboot();
   }
   
-  // TODO Implement 2 arguments for band masks
   sendAT("+UBANDMASK?");                              // Check Band Mask, by reducing the bands, connection time reduces significantly
   waitResponse(MODEM_TIMEOUT, "+UBANDMASK: 0,");
 
   uint64_t _bandMask0 = atoi(readStringUntil(','));
-  //readStringUntil(',');
-  //uint64_t _bandMask1 = atoi(readStringUntil('\r'));
+  readStringUntil(',');
+  uint64_t _bandMask1 = atoi(readStringUntil('\r'));
 
-  if( _bandMask0 != bandMask )
+  if( _bandMask0 != bandMask0 )
   {
-    sprintf(command, "+UBANDMASK=0,%i,1,%i", bandMask, bandMask);
+    sprintf(command, "+UBANDMASK=0,%i", bandMask0);
     sendAT(command);
     
-    if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
-    
-    reboot();
+    waitResponse(MODEM_TIMEOUT, R_OK);
   }
+  if( _bandMask1 != bandMask1 )
+  {
+    sprintf(command, "+UBANDMASK=1,%i", bandMask1);
+    sendAT(command);
+    
+    waitResponse(MODEM_TIMEOUT, R_OK);
+  }
+  
+  if( (_bandMask0 != bandMask0) || (_bandMask1 != bandMask1) )  reboot();
 
   sendAT("+UDCONF=1,1");              // Enable HEX mode for sockets
   if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
@@ -282,7 +280,7 @@ bool iotublox_init(uint8_t mnoProf, uint8_t rat, uint64_t bandMask)
   sendAT("+URAT?");                   // Check RAT technology
   waitResponse(MODEM_TIMEOUT, "+URAT: ");
   
-  // TODO accept 2 RATs
+  // TODO accept 2 RATs -> may use strtok
   uint8_t _rat = atoi(readStringUntil('\r'));
 
   if( _rat != rat )
@@ -302,9 +300,9 @@ bool iotublox_init(uint8_t mnoProf, uint8_t rat, uint64_t bandMask)
   return true;
 }
 
-/**
-* NOT IMPLEMENTED
-* */
+//
+// TODO NOT IMPLEMENTED
+//
 bool powerSave(bool upsv, bool psm, const char* tau, const char* active)
 {
   if( upsv )  sendAT("+UPSV=4");
