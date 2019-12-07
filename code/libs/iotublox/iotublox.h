@@ -46,24 +46,33 @@ static char R_CME_ERROR[] = "+CME ERROR: " ;//TODO NL_CHAR check if before
 #define YIELD() nrf_delay_us(0)
 
 typedef struct {
+    bool      connected;
     uint8_t   identifier;
     uint16_t  length;
-    char*     content;
-    bool      connected;
+    uint8_t   content[513];
 } socket_t;
 
-socket_t socket;
+socket_t socket = {
+  .connected    = false,
+  .identifier   = 99,
+  .length       =  0,
+  .content      = "",
+};
 
 typedef const char* ModemConstStr;
 
 char *greetingText = "Hello World";
 char* serverAdress;
+char _atcommand[AT_BUFFER] = "";        // Static allocate memory to avoid malloc and fragmentation -> sendAT
+char _ret[1024 + 1] = "";               // Static allocate memory to avoid malloc and fragmentation -> readStringUntil
 bool _isConnected = false;
 unsigned char clientBuf[1500] = "";
 
 char* readStringUntil(char terminator);
 uint32_t millis(void);
 void reboot(void);
+void sendAT(char* arg);
+void iot_closeSocket(uint8_t _socket);
 
 /**
 * @brief Function for waiting for a response from command.
@@ -121,7 +130,7 @@ uint8_t waitResponse(uint32_t timeout_ms, char* data)
         NRF_LOG_INFO("### URC Data Received: %i on %i", socket.length, socket.identifier);
       } else if (strstr(resp, "+UUSOCL: ") != NULL) {
         uint8_t _s = atoi(readStringUntil('\r'));
-        socket.content = false;
+        socket.connected = false;
         NRF_LOG_INFO("### URC Sock Closed: %i", _s);
       }
     }
@@ -157,7 +166,9 @@ uint8_t waitResponse(uint32_t timeout_ms, char* data)
 * */
 char *readStringUntil(char terminator)
 {
-  char *_ret = (char*)calloc(MODEM_RX_BUFFER, sizeof(char));
+  //char *_ret = (char*)calloc(1025, sizeof(char));
+  memset(_ret, '\0', sizeof(_ret));
+
   unsigned long startMillis = millis();
   
   while ((millis() - startMillis) < MODEM_TIMEOUT)
@@ -171,6 +182,121 @@ char *readStringUntil(char terminator)
 
   return _ret;
   
+}
+
+/**
+* @brief Write to an open TCP socket.
+*
+* @param data to write and size.
+*
+* @return true if succesful.
+* */
+bool iot_writeSSL(const char* data/*, size_t size*/)
+{
+  size_t size = strlen(data);
+  char _command[512 + 19] = "";
+
+  sendAT("AT+UDCONF=1,1");          // Enable HEX mode
+  waitResponse(MODEM_TIMEOUT, R_OK);
+
+  sendAT("AT+USOSEC=0,1,0");        // Enable SSL on TCP
+  waitResponse(MODEM_TIMEOUT, R_OK);
+
+  sprintf(_command, "AT+USOWR=%i,%i,\"", socket.identifier, size);
+    
+  // Convert data command into HEX
+  for (size_t i = 0; i < size; i++) {
+    char _c[3];
+    sprintf(_c, "%02X", data[i]);     // TODO check memory and time resources.
+    strcat(_command, _c);
+  }
+
+  strcat(_command, "\"");
+
+  char usowrResp[14] = "";          // Example: +USOWR: 0,512
+  sprintf(usowrResp, "+USOWR: %i,%i", socket.identifier, size);
+  waitResponse(120000, usowrResp);
+
+  char uusordURC[12] = "";          // Example: +UUSORD: 0,1024
+  sprintf(uusordURC, "+UUSORD: &i,", socket.identifier);
+  if( waitResponse(120000, uusordURC) == 1)  // Wait for response?
+    socket.length = atoi(readStringUntil('\r'));
+  else
+  {
+    iot_closeSocket(socket.identifier);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+* @brief Close the TCP socket.
+*
+* @param socket to be closed.
+* */
+void iot_closeSocket(uint8_t _socket)
+{
+  char closeSocket[8 + 1] = "";
+  sprintf(closeSocket, "+USOCL=%i", _socket);
+
+  sendAT(closeSocket);
+
+  if(waitResponse(120000, R_OK) == 1)
+    socket.connected = false;
+}
+
+/**
+* @brief Read data from the socket.
+*
+* @return true if succesful.
+* */
+bool iot_readSocket(void)
+{
+  char _command[13 + 1]    = "";      // Example AT+USORD=0,1024
+  char sock_data[1024 + 1] = "";      // Max socket length is 1024, when HEX == 512
+
+  memset(socket.content, '\0', sizeof(socket.content));
+
+  sprintf(_command, "+USORD=%i,%i", socket.identifier, socket.length);
+  sendAT(_command);
+
+  sprintf(_command, "+USORD: %i,%i,\"", socket.identifier, socket.length);
+  if( waitResponse(MODEM_TIMEOUT, _command) == 1)                   // Wait for response here or annother function
+  {
+    char* _sock_data = readStringUntil('\"');
+    strncpy(sock_data, _sock_data, strlen(_sock_data) - 1 );  // Remove last \"
+  }
+  else
+  {
+    iot_closeSocket(socket.identifier);
+    return false;
+  }
+
+  // Convert HEX char array to String
+  for(uint16_t i = 0; i < strlen(sock_data) / 2; i++)
+  {
+    uint8_t n1 = sock_data[i * 2];
+    uint8_t n2 = sock_data[i * 2 + 1];
+
+    if (n1 > '9') {
+    n1 = (n1 - 'A') + 10;
+    } else {
+    n1 = (n1 - '0');
+    }
+
+    if (n2 > '9') {
+    n2 = (n2 - 'A') + 10;
+    } else {
+    n2 = (n2 - '0');
+    }
+
+    socket.content[i] = (n1 << 4) | n2;
+  }
+
+  strcat(socket.content, NL_CHAR);   // Pretty print;
+
+  return true;
 }
 
 /**
@@ -195,14 +321,16 @@ uint32_t millis(void)
 * */
 void sendAT(char* arg)
 {
-  char *command = malloc(strlen(arg)+1);
+  //char *_atcommand = calloc(strlen(arg) + 4);
 
     NRF_LOG_INFO("-> %s", arg);
     NRF_LOG_FLUSH();
 
-  sprintf(command, "AT%s%s", arg, NL_CHAR);
+  sprintf(_atcommand, "AT%s%s", arg, NL_CHAR);
 
-  uart_write(command);
+  uart_write(_atcommand);
+
+  //free(_atcommand);
 }
 
 /**
@@ -217,9 +345,9 @@ bool iotublox_init(uint8_t mnoProf, uint8_t rat, uint64_t bandMask0, uint64_t ba
   sendAT("E0");                      // Echo Off.
   if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
   
-  char command[AT_BUFFER] = "";
-  sprintf(command, "+CSGT=1,\"%s\"", greetingText);
-  sendAT(command);
+  char _command[AT_BUFFER] = "";
+  sprintf(_command, "+CSGT=1,\"%s\"", greetingText);
+  sendAT(_command);
   if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
 
   sendAT("+UMNOPROF?");                           // Check MNO Profile.
@@ -234,8 +362,8 @@ bool iotublox_init(uint8_t mnoProf, uint8_t rat, uint64_t bandMask0, uint64_t ba
   }
   if( _mno != mnoProf )
   {
-      sprintf(command, "+UMNOPROF=%i", mnoProf);
-      sendAT(command);
+      sprintf(_command, "+UMNOPROF=%i", mnoProf);
+      sendAT(_command);
       if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
       
       reboot();
@@ -250,15 +378,15 @@ bool iotublox_init(uint8_t mnoProf, uint8_t rat, uint64_t bandMask0, uint64_t ba
 
   if( _bandMask0 != bandMask0 )
   {
-    sprintf(command, "+UBANDMASK=0,%i", bandMask0);
-    sendAT(command);
+    sprintf(_command, "+UBANDMASK=0,%i", bandMask0);
+    sendAT(_command);
     
     waitResponse(MODEM_TIMEOUT, R_OK);
   }
   if( _bandMask1 != bandMask1 )
   {
-    sprintf(command, "+UBANDMASK=1,%i", bandMask1);
-    sendAT(command);
+    sprintf(_command, "+UBANDMASK=1,%i", bandMask1);
+    sendAT(_command);
     
     waitResponse(MODEM_TIMEOUT, R_OK);
   }
@@ -288,8 +416,8 @@ bool iotublox_init(uint8_t mnoProf, uint8_t rat, uint64_t bandMask0, uint64_t ba
     sendAT("+CFUN=0");                  // Turn radio Off
     if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
 
-    sprintf(command, "+URAT=%i", rat);  // Change RAT
-    sendAT(command);
+    sprintf(_command, "+URAT=%i", rat);  // Change RAT
+    sendAT(_command);
 
     if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
 
@@ -329,10 +457,10 @@ bool powerSave(bool upsv, bool psm, const char* tau, const char* active)
 * */
 bool iotublox_connect(const char* apn)
 {
-  char command[AT_BUFFER] = "";
+  char _command[AT_BUFFER] = "";
 
-  sprintf(command, "+CGDCONT=1,\"IP\",\"%s\"", apn);    // Define PDP context 1
-  sendAT(command);  
+  sprintf(_command, "+CGDCONT=1,\"IP\",\"%s\"", apn);    // Define PDP context 1
+  sendAT(_command);  
   waitResponse(MODEM_TIMEOUT, R_OK);
   
   sendAT("+COPS=0");                                    // Automatic operator selection
