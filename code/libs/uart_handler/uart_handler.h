@@ -28,9 +28,9 @@
 #include "nrf_queue.h"
 #include "nrf_delay.h"
 
-#define UART_RX_BUFFER    255
+#define UART_RX_BUFFER    1024
 uint8_t _buff[UART_RX_BUFFER] = "";
-uint8_t _iTail = 0;
+uint16_t _iTail = 0;
 
 typedef struct {
     uint8_t * p_data;
@@ -90,9 +90,9 @@ bool uart_clear(void)
   return true;
 }
 
-uint8_t uart_available(void)
+uint16_t uart_available(void)
 {
-  uint8_t _d = (uint32_t)(strlen(_buff) - _iTail);
+  uint16_t _d = (uint16_t)(strlen(_buff) - _iTail);
 
   if(_d < 0)
     return UART_RX_BUFFER + _d;
@@ -102,13 +102,13 @@ uint8_t uart_available(void)
 
 uint8_t uart_read(void)
 {
-  uint8_t value = _buff[_iTail];
-  size_t length = strlen(_buff);
+  uint8_t value   = _buff[_iTail];
+  uint16_t length = strlen(_buff);
   
   if(!uart_available())
     return -1;
 
-  _iTail = (uint8_t)(_iTail + 1) % UART_RX_BUFFER;
+  _iTail = (uint16_t)(_iTail + 1) % UART_RX_BUFFER;
 
   if(_iTail == length)
   {
