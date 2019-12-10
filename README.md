@@ -12,6 +12,7 @@
 ## TODO
 
 - [ ] More details about battery etc...
+- [ ] Check AT response based on the last chars, in order to avoid missing URCs when after "OK" for example
 
 ## Amazon AWS and MQTT
 
@@ -26,6 +27,19 @@ https://devzone.nordicsemi.com/f/nordic-q-a/44638/how-to-move-an-sdk-example-out
 `macros="CMSIS_CONFIG_TOOL=C:/nRF/nRF5_SDK_15.2.0_9412b96/external_tools/cmsisconfig/CMSIS_Configuration_Wizard.jar;SDK=C:/nRF/nRF5_SDK_15.2.0_9412b96"`
 
 I changed ALL occurrences of "../../../../../.." to $(SDK)
+
+## Compile the software on SDK folder
+
+* Clone this repository   
+```> git clone https://github.com/ldab/...```
+
+* Download the source code for nRF5_SDK_16.0.0_98a08e2 from Nordic Semi
+
+* Copy ```custom_board.h``` to the ```/components/boards``` folder of the SDK
+
+* Copy the folder ```code``` to the ```/example``` folder of the SDK
+
+* Open the SEGGER Embedded Studio project file located in ```code\ninab3\blank\ses\```
 
 ## ATSAMD21E Variant
 

@@ -41,6 +41,15 @@ static void sleep_handler(void)
     __WFE();
 }
 
+void URC_handler(void)
+{
+  _URC = false;
+  NRF_LOG_INFO("URC: %s", _buff);
+  NRF_LOG_FLUSH();
+
+  uart_clear();
+}
+
 /**
  * @brief Function for main application entry.
  */
@@ -81,9 +90,10 @@ int main(void)
     NRF_LOG_INFO("%s", welcome);
     NRF_LOG_FLUSH();
 
-    uart_write(welcome);
+    //uart_write(welcome);
 
-    iotublox_init(100, 8, 524420, 524420);
+    iotublox_init(199, "8,7", 524420, 524420);
+    iotublox_powerSave(false, false, NULL, NULL);
     iotublox_connect("lpwa.telia.iot");
 
     while (true)
@@ -91,19 +101,20 @@ int main(void)
     #if NRF_PWR_MGMT_CONFIG_USE_SCHEDULER
         app_sched_execute();
     #endif // NRF_PWR_MGMT_CONFIG_USE_SCHEDULER
+        if(_URC == true)  URC_handler();
 
         if( !nrf_gpio_pin_read(BUTTON_2) )
         {
-          NRF_LOG_INFO("uart_available: %i", uart_available());
-          char data[64] = "";
-          uint8_t _i = 0;
+          iot_connSocket("untrol.blynk.cc", 443);
 
-          while(uart_available())
-          {
-            data[_i] = uart_read();
-            _i++;
-          }
-          uart_write(data);
+          char GET[] = "GET /ENaXVkhOawt3DJm80zrgIiCIkeGxecGF/get/V1 HTTP/1.1\n\rHost: untrol.blynk.cc\n\rConnection: close\n\r\n\r";
+          iot_writeSSL(GET, strlen(GET));
+          iot_readSocket();
+
+          //uart_write(socket.content);
+          
+          NRF_LOG_INFO("Respons -> %s", socket.content);
+          NRF_LOG_FLUSH();
 
           nrf_delay_ms(1000);
         }

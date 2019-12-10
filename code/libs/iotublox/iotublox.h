@@ -28,20 +28,19 @@ extern "C" {
 #include "uart_handler.h"
 
 #if !defined( MODEM_RX_BUFFER )
-  #define MODEM_RX_BUFFER 64
+  #define MODEM_RX_BUFFER 255
 #endif
 
 #ifndef AT_BUFFER
-  #define AT_BUFFER 64
+  #define AT_BUFFER 255
 #endif
 
 #define MODEM_TIMEOUT   1000L
 
-// May want to use PROGMEM
-#define NL_CHAR "\r\n"
-static char R_OK[]        = "OK" NL_CHAR;
-static char R_ERROR[]     = "ERROR" NL_CHAR;
-static char R_CME_ERROR[] = "+CME ERROR: " ;//TODO NL_CHAR check if before
+#define NL_CHAR     "\r\n"
+#define R_OK        "OK" NL_CHAR
+#define R_ERROR     "ERROR" NL_CHAR
+#define R_CME_ERROR "+CME ERROR: "  //TODO NL_CHAR check if before
 
 #define YIELD() nrf_delay_us(0)
 
@@ -62,11 +61,10 @@ socket_t socket = {
 typedef const char* ModemConstStr;
 
 char *greetingText = "Hello World";
-char* serverAdress;
 char _atcommand[AT_BUFFER] = "";        // Static allocate memory to avoid malloc and fragmentation -> sendAT
 char _ret[1024 + 1] = "";               // Static allocate memory to avoid malloc and fragmentation -> readStringUntil
 bool _isConnected = false;
-unsigned char clientBuf[1500] = "";
+bool _URC = false;
 
 char* readStringUntil(char terminator);
 uint32_t millis(void);
@@ -125,10 +123,18 @@ uint8_t waitResponse(uint32_t timeout_ms, char* data)
         index = 5;
         goto finish;
       } else if (strstr(resp, "+UUSORD: ") != NULL) {
+        _URC = true;                                    // Prevent Buffer Flush on URC
         socket.identifier = atoi(readStringUntil(','));
         socket.length     = atoi(readStringUntil('\r'));
         NRF_LOG_INFO("### URC Data Received: %i on %i", socket.length, socket.identifier);
+        if( (strlen(_buff) - _iTail ) < 3)             // "Empty" buffer would have extra \n when compared to response.
+        {
+          uart_clear();
+          index = 1;
+          goto  finish;
+        }
       } else if (strstr(resp, "+UUSOCL: ") != NULL) {
+        _URC = true;                                    // Prevent Buffer Flush on URC
         uint8_t _s = atoi(readStringUntil('\r'));
         socket.connected = false;
         NRF_LOG_INFO("### URC Sock Closed: %i", _s);
@@ -136,10 +142,12 @@ uint8_t waitResponse(uint32_t timeout_ms, char* data)
     }
   } while ((millis() - startMillis ) < timeout_ms);
 
-  finish:
+  finish: ;
+
+  uint16_t resp_size = strlen(resp);
 
   if (!index) {
-    if (strlen(resp)){
+    if (resp_size){
       NRF_LOG_INFO("### Unhandled: %s", resp);
       NRF_LOG_FLUSH();
     }else{
@@ -149,9 +157,24 @@ uint8_t waitResponse(uint32_t timeout_ms, char* data)
     uart_clear();
   }
   else{
-    //NRF_LOG_INFO("<- %.*s", strlen(resp)-1, resp); TODO Remove \n from the end
-    NRF_LOG_INFO("<- %s", resp);
-    NRF_LOG_FLUSH();
+    if(strlen(_buff) > 0)
+    {
+      // Remove leading and trailing "\n\r" for Logging
+      char dbg_buff[1024] = "";
+
+      if (_buff[0] == '\r' && _buff[1] == '\n')
+        strncpy(dbg_buff, _buff + 2, strlen(_buff) - 8 - 2);
+
+      NRF_LOG_INFO("<- %s", dbg_buff);
+      NRF_LOG_FLUSH();
+    }
+    else
+    {
+      // Remove leading and trailing "\n\r" for Logging
+      char* _resp = strtok(resp, "\r");
+      NRF_LOG_INFO("<- %s", _resp);
+      NRF_LOG_FLUSH();
+    }
   }
 
   return index;
@@ -171,17 +194,51 @@ char *readStringUntil(char terminator)
 
   unsigned long startMillis = millis();
   
-  while ((millis() - startMillis) < MODEM_TIMEOUT)
+  while ((millis() - startMillis) < 10000)
   {
       _ret[strlen(_ret)] = uart_read();
       if(_ret[strlen(_ret)-1] == terminator) break;
   }
 
-  if( terminator != ',' )
+  if( terminator != ',' && _URC == false)
     uart_clear();   // Flush uart to remove OK from buffer
 
   return _ret;
   
+}
+
+/**
+* @brief Create and connect to the socket
+*
+* @param host and port.
+* */
+void iot_connSocket(char* _host, uint16_t _port)
+{
+  char _command[255] = "";
+
+  iot_closeSocket( 0 );
+  uart_clear();
+
+  sendAT("+UDCONF=1,1");          // Enable HEX mode
+  waitResponse(MODEM_TIMEOUT, R_OK);
+
+  sendAT("+USOCR=6");                                     // Create TCP Socket
+  waitResponse(MODEM_TIMEOUT, "+USOCR: ");
+  socket.identifier = atoi(readStringUntil('\r'));
+
+  nrf_delay_ms(100); // breath
+
+  sprintf(_command, "+USOSEC=%i,1,0", socket.identifier);
+  sendAT(_command);                                       // Enable SSL on TCP on socket open previously
+  waitResponse(MODEM_TIMEOUT, R_OK);
+
+  nrf_delay_ms(100); // breath
+
+  sprintf(_command, "+USOCO=%i,\"%s\",%i", socket.identifier, _host, _port);
+  sendAT(_command);                                       // Connect to the Socket
+  if(waitResponse(120000L, R_OK) == 1)
+    socket.connected = true;
+
 }
 
 /**
@@ -191,43 +248,29 @@ char *readStringUntil(char terminator)
 *
 * @return true if succesful.
 * */
-bool iot_writeSSL(const char* data/*, size_t size*/)
+bool iot_writeSSL(const char* data, uint16_t size)
 {
-  size_t size = strlen(data);
-  char _command[512 + 19] = "";
+  //size_t size = strlen(data);
+  char _command[512 + 20] = "";
 
-  sendAT("AT+UDCONF=1,1");          // Enable HEX mode
-  waitResponse(MODEM_TIMEOUT, R_OK);
-
-  sendAT("AT+USOSEC=0,1,0");        // Enable SSL on TCP
-  waitResponse(MODEM_TIMEOUT, R_OK);
-
-  sprintf(_command, "AT+USOWR=%i,%i,\"", socket.identifier, size);
+  sprintf(_command, "+USOWR=%i,%i,\"", socket.identifier, size);
     
   // Convert data command into HEX
-  for (size_t i = 0; i < size; i++) {
+  for (uint16_t i = 0; i < size; i++) {
     char _c[3];
     sprintf(_c, "%02X", data[i]);     // TODO check memory and time resources.
     strcat(_command, _c);
   }
 
   strcat(_command, "\"");
+  sendAT(_command);
 
-  char usowrResp[14] = "";          // Example: +USOWR: 0,512
-  sprintf(usowrResp, "+USOWR: %i,%i", socket.identifier, size);
-  waitResponse(120000, usowrResp);
-
-  char uusordURC[12] = "";          // Example: +UUSORD: 0,1024
-  sprintf(uusordURC, "+UUSORD: &i,", socket.identifier);
-  if( waitResponse(120000, uusordURC) == 1)  // Wait for response?
-    socket.length = atoi(readStringUntil('\r'));
+  sprintf(_command, "+USOWR: %i,%i" NL_CHAR NL_CHAR R_OK, socket.identifier, size); // Example: +USOWR: 0,512\r\n\r\nOK\r\n
+  if(waitResponse(120000L, _command) == 1)
+    return true;
+   
   else
-  {
-    iot_closeSocket(socket.identifier);
     return false;
-  }
-
-  return true;
 }
 
 /**
@@ -253,6 +296,16 @@ void iot_closeSocket(uint8_t _socket)
 * */
 bool iot_readSocket(void)
 {
+  char uusordURC[12] = "";          // Example: +UUSORD: 0,1024
+  sprintf(uusordURC, "+UUSORD: %i", socket.identifier);
+  /*if(*/ waitResponse(120000L, uusordURC); /*!= 1 || socket.length == 0)  // TODO this is ugly, fix it
+  {
+    iot_closeSocket(socket.identifier);
+    return false;
+  }*/
+
+  uart_clear();
+
   char _command[13 + 1]    = "";      // Example AT+USORD=0,1024
   char sock_data[1024 + 1] = "";      // Max socket length is 1024, when HEX == 512
 
@@ -262,10 +315,11 @@ bool iot_readSocket(void)
   sendAT(_command);
 
   sprintf(_command, "+USORD: %i,%i,\"", socket.identifier, socket.length);
-  if( waitResponse(MODEM_TIMEOUT, _command) == 1)                   // Wait for response here or annother function
+  if( waitResponse(MODEM_TIMEOUT, _command) == 1)
   {
+    nrf_delay_ms(500); // breath
     char* _sock_data = readStringUntil('\"');
-    strncpy(sock_data, _sock_data, strlen(_sock_data) - 1 );  // Remove last \"
+    strncpy(sock_data, _sock_data, socket.length * 2 );
   }
   else
   {
@@ -296,6 +350,7 @@ bool iot_readSocket(void)
 
   strcat(socket.content, NL_CHAR);   // Pretty print;
 
+  socket.length = 0;
   return true;
 }
 
@@ -326,7 +381,7 @@ void sendAT(char* arg)
     NRF_LOG_INFO("-> %s", arg);
     NRF_LOG_FLUSH();
 
-  sprintf(_atcommand, "AT%s%s", arg, NL_CHAR);
+  sprintf(_atcommand, "AT%s" NL_CHAR, arg);
 
   uart_write(_atcommand);
 
@@ -340,36 +395,36 @@ void sendAT(char* arg)
 *
 * @return True if success.
 * */
-bool iotublox_init(uint8_t mnoProf, uint8_t rat, uint64_t bandMask0, uint64_t bandMask1)
+bool iotublox_init(uint8_t mnoProf, char* rat, uint64_t bandMask0, uint64_t bandMask1)
 {
-  sendAT("E0");                      // Echo Off.
+  sendAT("E0");                                                     // Echo Off.
   if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
   
   char _command[AT_BUFFER] = "";
-  sprintf(_command, "+CSGT=1,\"%s\"", greetingText);
+  sprintf(_command, "+CSGT=1,\"%s\"", greetingText);                // Set greeting text to detect when module is ready;
   sendAT(_command);
   if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
 
-  sendAT("+UMNOPROF?");                           // Check MNO Profile.
+  sendAT("+UMNOPROF?");                                             // Check MNO Profile.
   if (waitResponse(MODEM_TIMEOUT, "+UMNOPROF: ") != 1) return false;
 
   uint8_t _mno = atoi(readStringUntil('\r'));
 
   if( mnoProf == 0 || _mno == 0 )
   {
-    NRF_LOG_INFO("### WARNING:  default = 0 should not be used!");
+    NRF_LOG_WARNING("### WARNING:  default = 0 should not be used!");
     NRF_LOG_FLUSH();
   }
   if( _mno != mnoProf )
   {
-      sprintf(_command, "+UMNOPROF=%i", mnoProf);
-      sendAT(_command);
-      if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
-      
-      reboot();
+    sprintf(_command, "+UMNOPROF=%i", mnoProf);
+    sendAT(_command);
+    if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
+    
+    reboot();
   }
   
-  sendAT("+UBANDMASK?");                              // Check Band Mask, by reducing the bands, connection time reduces significantly
+  sendAT("+UBANDMASK?");                                            // Check Band Mask, by reducing the bands, connection time reduces significantly
   waitResponse(MODEM_TIMEOUT, "+UBANDMASK: 0,");
 
   uint64_t _bandMask0 = atoi(readStringUntil(','));
@@ -393,45 +448,87 @@ bool iotublox_init(uint8_t mnoProf, uint8_t rat, uint64_t bandMask0, uint64_t ba
   
   if( (_bandMask0 != bandMask0) || (_bandMask1 != bandMask1) )  reboot();
 
-  sendAT("+UDCONF=1,1");              // Enable HEX mode for sockets
+  sendAT("+CMEE=2");                                                // Enable Error verbose mode
   if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
 
-  sendAT("+CMEE=2");                  // Enable Error verbose mode
-  if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
+  //sendAT("+CEREG=4");                 // Enable URCs on the EPS network registration status
+  //if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
 
-  sendAT("+CEREG=4");                 // Enable URCs on the EPS network registration status
-  if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
+  //sendAT("+CREG=2");                  // Enable URCs on the GSM network registration status
+  //if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
 
-  sendAT("+CREG=2");                  // Enable URCs on the GSM network registration status
-  if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
-
-  sendAT("+URAT?");                   // Check RAT technology
+  sendAT("+URAT?");                                                 // Check RAT technology (NB-IoT or Cat-M1)
   waitResponse(MODEM_TIMEOUT, "+URAT: ");
   
-  // TODO accept 2 RATs -> may use strtok
-  uint8_t _rat = atoi(readStringUntil('\r'));
+  // TODO this is a bit ugly -> Accept preferred RAT
+  char* _rat   = readStringUntil('\r');
+  uint8_t size_rat_read = strlen(_rat) - 1; // remove \r fromt he end
+  uint8_t rat1 = atoi(strtok(_rat, ","));
+  uint8_t rat2 = atoi(strtok(NULL, "\r"));
 
-  if( _rat != rat )
+  if( size_rat_read != strlen(rat) )
   {
-    sendAT("+CFUN=0");                  // Turn radio Off
-    if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
+    sendAT("+CFUN=0");                                              // Turn radio Off
+    if (waitResponse(180000L, R_OK) != 1) return false;
 
-    sprintf(_command, "+URAT=%i", rat);  // Change RAT
+    sprintf(_command, "+URAT=%s", rat);                             // Change RAT
     sendAT(_command);
-
     if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
 
-    sendAT("+CFUN=1");                  // Turn radio On
-    if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
+    sendAT("+CFUN=1");                                              // Turn radio On
+    if (waitResponse(180000L, R_OK) != 1) return false;
+  }
+  else if ( strlen(rat) == 1 )
+  {
+    if( rat1 != rat[0] - '0' )
+    {
+      sendAT("+CFUN=0");                                            // Turn radio Off
+      if (waitResponse(180000L, R_OK) != 1) return false;
+
+      sprintf(_command, "+URAT=%c", (uint8_t)rat[0]);               // Change RAT
+      sendAT(_command);
+
+      if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
+
+      sendAT("+CFUN=1");                                            // Turn radio On
+      if (waitResponse(180000L, R_OK) != 1) return false;
+    }
+  }
+    else if ( strlen(rat) == 3 )
+  {
+    if( rat1 != rat[0] - '0' )
+    {
+      sendAT("+CFUN=0");                                            // Turn radio Off
+      if (waitResponse(180000L, R_OK) != 1) return false;
+
+      sprintf(_command, "+URAT=%s", rat);                           // Change RAT
+      sendAT(_command);
+      if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
+
+      sendAT("+CFUN=1");                                            // Turn radio On
+      if (waitResponse(180000L, R_OK) != 1) return false;
+    }
+    else if( rat2 != rat[2] - '0' )
+    {
+      sendAT("+CFUN=0");                                            // Turn radio Off
+      if (waitResponse(180000L, R_OK) != 1) return false;
+
+      sprintf(_command, "+URAT=%s", rat);                           // Change RAT
+      sendAT(_command);
+      if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
+
+      sendAT("+CFUN=1");                                            // Turn radio On
+      if (waitResponse(180000L, R_OK) != 1) return false;
+    }
   }
 
   return true;
 }
 
 //
-// TODO NOT IMPLEMENTED
+// TODO accept Timers in DEC
 //
-bool powerSave(bool upsv, bool psm, const char* tau, const char* active)
+bool iotublox_powerSave(bool upsv, bool psm, const char* tau, const char* active)
 {
   if( upsv )  sendAT("+UPSV=4");
   else        sendAT("+UPSV=0");
@@ -440,10 +537,11 @@ bool powerSave(bool upsv, bool psm, const char* tau, const char* active)
   if( !psm )  sendAT("+CPSMS=0");
   else
   {
-    // AT+CPSMS=1,,,"00000010","00000010" // psm, tau, active
-    //sendAT("+CPSMS=1,,,\"", tau, ",\"", active, "\"");
+    char _psm[36];
+    sprintf(_psm, "AT+CPSMS=1,,,\"%s\",\"%s\"", tau, active);
+    sendAT( _psm );
   }
-  if (waitResponse(1000L, R_OK) != 1) return false;
+  if (waitResponse(MODEM_TIMEOUT * 10, R_OK) != 1) return false;
 
   return true;
 }
@@ -466,8 +564,17 @@ bool iotublox_connect(const char* apn)
   sendAT("+COPS=0");                                    // Automatic operator selection
   if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
 
-  sendAT("+CGACT=1,1");                                 // Activate PDP profile/context 1
-  if (waitResponse(150000L, R_OK) != 1) return false;
+  sendAT("+COPS?");
+  unsigned long startMillis = millis();
+  while( waitResponse(MODEM_TIMEOUT, "+COPS: 0,0,") != 1 && millis() - startMillis < 30000L)  // TODO try to connect for 30sec if fails -> sleep.
+  {
+    sendAT("+COPS?");
+  }
+
+  uart_clear();
+
+  //sendAT("+CGACT=1,1");                                 // Activate PDP profile/context 1
+  //if (waitResponse(150000L, R_OK) != 1) return false;
 
   sendAT("+CGATT=1");                                   // GPRS Attach 
   if (waitResponse(150000L, R_OK) != 1) return false;
@@ -486,6 +593,8 @@ void reboot(void)
   // TODO Wait for V_INT or Greeting URC
   if( waitResponse(15000L, greetingText) == 1)
     uart_clear();
+
+  nrf_delay_ms(500);             // breath -> Without it, receiving SIM ERROR;
 
   sendAT("E0");                  // Echo Off.
   waitResponse(MODEM_TIMEOUT, R_OK);
