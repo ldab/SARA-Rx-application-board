@@ -42,7 +42,7 @@ extern "C" {
 #define R_ERROR     "ERROR" NL_CHAR
 #define R_CME_ERROR "+CME ERROR: "  //TODO NL_CHAR check if before
 
-#define YIELD() nrf_delay_us(0)
+#define YIELD() nrf_delay_us(10)
 
 typedef struct {
     bool      connected;
@@ -64,7 +64,6 @@ char *greetingText = "Hello World";
 char _atcommand[AT_BUFFER] = "";        // Static allocate memory to avoid malloc and fragmentation -> sendAT
 char _ret[1024 + 1] = "";               // Static allocate memory to avoid malloc and fragmentation -> readStringUntil
 bool _isConnected = false;
-bool _URC = false;
 
 char* readStringUntil(char terminator);
 uint32_t millis(void);
@@ -83,11 +82,9 @@ uint8_t waitResponse(uint32_t timeout_ms, char* data)
 {
   ModemConstStr r2 = R_ERROR;
   ModemConstStr r3 = R_CME_ERROR;
-  ModemConstStr r4 = NULL;
-  ModemConstStr r5 = NULL;
   
   char resp[MODEM_RX_BUFFER] = "";
-  int index = 0;
+  uint8_t index = 0;
   unsigned long startMillis = millis();
   do {
     YIELD();
@@ -103,6 +100,12 @@ uint8_t waitResponse(uint32_t timeout_ms, char* data)
         memset(resp, '\0', sizeof(resp));
         resp[strlen(resp)] = uart_read();
       }
+      // MQTT has a leading \r
+      if(resp[0] == '\r' && resp[1] == '\r' && resp[2] == '\n') 
+      {
+        memset(resp, '\0', sizeof(resp));
+        resp[strlen(resp)] = uart_read();
+      }
 
         if(strstr(resp, data) != NULL){
         index = 1;
@@ -112,32 +115,18 @@ uint8_t waitResponse(uint32_t timeout_ms, char* data)
         goto finish;
       } else if (strstr(resp, r3) != NULL) {
         index = 3;
-        // OR memcpy(resp, _buff, MODEM_RX_BUFFER);
-        //strncpy(resp, _buff, MODEM_RX_BUFFER);
-        strcat(resp, readStringUntil('\r'));
-        goto finish;
-      } else if (strcmp(resp, r4) == 0) {
-        index = 4;
-        goto finish;
-      } else if (strcmp(resp, r5) == 0) {
-        index = 5;
+        strcat(resp, readStringUntil('\n'));
         goto finish;
       } else if (strstr(resp, "+UUSORD: ") != NULL) {
-        _URC = true;                                    // Prevent Buffer Flush on URC
         socket.identifier = atoi(readStringUntil(','));
         socket.length     = atoi(readStringUntil('\r'));
         NRF_LOG_INFO("### URC Data Received: %i on %i", socket.length, socket.identifier);
-        if( (strlen(_buff) - _iTail ) < 3)             // "Empty" buffer would have extra \n when compared to response.
-        {
-          uart_clear();
-          index = 1;
-          goto  finish;
-        }
+        NRF_LOG_FLUSH();
       } else if (strstr(resp, "+UUSOCL: ") != NULL) {
-        _URC = true;                                    // Prevent Buffer Flush on URC
-        uint8_t _s = atoi(readStringUntil('\r'));
+        uint8_t _s = uart_read() - '0';
         socket.connected = false;
         NRF_LOG_INFO("### URC Sock Closed: %i", _s);
+        NRF_LOG_FLUSH();
       }
     }
   } while ((millis() - startMillis ) < timeout_ms);
@@ -200,8 +189,8 @@ char *readStringUntil(char terminator)
       if(_ret[strlen(_ret)-1] == terminator) break;
   }
 
-  if( terminator != ',' && _URC == false)
-    uart_clear();   // Flush uart to remove OK from buffer
+  if( terminator != ',' )
+    uart_clear();                         // Flush uart to remove OK from buffer
 
   return _ret;
   
@@ -216,10 +205,10 @@ void iot_connSocket(char* _host, uint16_t _port)
 {
   char _command[255] = "";
 
-  iot_closeSocket( 0 );
-  uart_clear();
+  //iot_closeSocket( 0 );
+  //uart_clear();
 
-  sendAT("+UDCONF=1,1");          // Enable HEX mode
+  sendAT("+UDCONF=1,1");                                  // Enable HEX mode
   waitResponse(MODEM_TIMEOUT, R_OK);
 
   sendAT("+USOCR=6");                                     // Create TCP Socket
@@ -234,10 +223,15 @@ void iot_connSocket(char* _host, uint16_t _port)
 
   nrf_delay_ms(100); // breath
 
-  sprintf(_command, "+USOCO=%i,\"%s\",%i", socket.identifier, _host, _port);
+  sprintf(_command, "+USOCO=%i,\"%s\",%d", socket.identifier, _host, _port);
   sendAT(_command);                                       // Connect to the Socket
   if(waitResponse(120000L, R_OK) == 1)
     socket.connected = true;
+  else
+  {
+    iot_closeSocket(socket.identifier);
+    uart_clear();
+  }
 
 }
 
@@ -250,9 +244,7 @@ void iot_connSocket(char* _host, uint16_t _port)
 * */
 bool iot_writeSSL(const char* data, uint16_t size)
 {
-  //size_t size = strlen(data);
   char _command[512 + 20] = "";
-
   sprintf(_command, "+USOWR=%i,%i,\"", socket.identifier, size);
     
   // Convert data command into HEX
@@ -265,7 +257,7 @@ bool iot_writeSSL(const char* data, uint16_t size)
   strcat(_command, "\"");
   sendAT(_command);
 
-  sprintf(_command, "+USOWR: %i,%i" NL_CHAR NL_CHAR R_OK, socket.identifier, size); // Example: +USOWR: 0,512\r\n\r\nOK\r\n
+  sprintf(_command, "+USOWR: %d,%d" NL_CHAR NL_CHAR R_OK, socket.identifier, size); // Example: +USOWR: 0,512\r\n\r\nOK\r\n
   if(waitResponse(120000L, _command) == 1)
     return true;
    
@@ -296,15 +288,9 @@ void iot_closeSocket(uint8_t _socket)
 * */
 bool iot_readSocket(void)
 {
-  char uusordURC[12] = "";          // Example: +UUSORD: 0,1024
-  sprintf(uusordURC, "+UUSORD: %i", socket.identifier);
-  /*if(*/ waitResponse(120000L, uusordURC); /*!= 1 || socket.length == 0)  // TODO this is ugly, fix it
-  {
-    iot_closeSocket(socket.identifier);
-    return false;
-  }*/
-
-  uart_clear();
+  waitResponse(120000L, "+UUSORD:");  // Example: +UUSORD: 0,1024
+  socket.identifier = atoi(readStringUntil(','));  // TODO check if leading space convert to Int alright
+  socket.length     = atoi(readStringUntil('\n')); // the same as above \r\n
 
   char _command[13 + 1]    = "";      // Example AT+USORD=0,1024
   char sock_data[1024 + 1] = "";      // Max socket length is 1024, when HEX == 512
@@ -348,10 +334,89 @@ bool iot_readSocket(void)
     socket.content[i] = (n1 << 4) | n2;
   }
 
-  strcat(socket.content, NL_CHAR);   // Pretty print;
-
   socket.length = 0;
   return true;
+}
+
+/**
+* @brief Set MQTT broker configuration
+* */
+void iotublox_mqtt_config(const char* host, uint16_t port, const char* id,
+                          const char* username, const char* password)
+{
+  char _mqttcommand[18 + 123] = "";                           // Set client ID, max 23 char AT+UMQTT=0,"352753090041680"
+  sprintf(_mqttcommand, "+UMQTT=0,\"%s\"", id);
+  sendAT(_mqttcommand);
+  waitResponse(MODEM_TIMEOUT, "+UMQTT: 0,1\r" NL_CHAR NL_CHAR R_OK);
+
+  sprintf(_mqttcommand, "+UMQTT=2,\"%s\",%i", host, port);  // Set Broker and Port -> AT+UMQTT=2,"www.commercialmqttbroker.com",65535
+  sendAT(_mqttcommand);
+  waitResponse(MODEM_TIMEOUT, "+UMQTT: 2,1\r" NL_CHAR NL_CHAR R_OK);
+
+  sprintf(_mqttcommand, "+UMQTT=4,\"%s\",\"%s\"", username, password);      // Set username and password -> AT+UMQTT=4,"test","abc123"
+  sendAT(_mqttcommand);
+  waitResponse(MODEM_TIMEOUT, "+UMQTT: 4,1\r" NL_CHAR NL_CHAR R_OK);
+}
+
+/**
+* @brief Login and Publish message to the MQTT Broker
+*
+* @param Payload to be published
+*
+* @return True if success.
+* */
+bool iotublox_mqtt_publish(const char* topic, const char* payload, uint8_t QoS)
+{
+  sendAT("+UMQTTC=1");                                                               // Connect to the Broker
+  if(waitResponse(120000L, "+UMQTTC: 1,") != 1 ) return false;
+  uint8_t mqtt_res = uart_read() - '0';
+  if(mqtt_res != 1)
+  {
+    NRF_LOG_WARNING("MQTT Connection error #%i", mqtt_res);
+    NRF_LOG_FLUSH();
+    return false;
+  }
+
+  if(waitResponse(120000L, "+UUMQTTC: 1,") !=1 ) return false;                       // Wait for Connection URC
+  mqtt_res = atoi(readStringUntil('\r'));
+  if(mqtt_res != 0)
+  {
+    NRF_LOG_WARNING("MQTT URC Connection error #%i", mqtt_res);
+    NRF_LOG_FLUSH();
+    return false;
+  }
+
+  // Convert Payload to HEX as string does not accept " and ,
+  char payload_hex[512] = "";
+  for (uint16_t i = 0; i < strlen(payload); i++) {
+    char _c[3];
+    sprintf(_c, "%02X", payload[i]);     // TODO check memory and time resources.
+    strcat(payload_hex, _c);
+  }
+  
+
+  char _mqttcommand[18 + 255] = "";
+  //sprintf(_mqttcommand, "+UMQTTC=2,%i,0,\"%s\",\"%s\"", QoS, topic, payload);      // Publish payload to a topic -> AT+UMQTTC=2,0,0,"sensor/heat/SD/bldg5/DelMarConfRm","23degrees Celsius"
+  sprintf(_mqttcommand, "+UMQTTC=2,%i,0,1,\"%s\",\"%s\"", QoS, topic, payload_hex);  // Publish payload to a topic in HEX -> AT+UMQTTC=2,0,0,1,"sensor/heat/SD/bldg5/DelMarConfRm","564981A654F"
+  sendAT(_mqttcommand);
+  if(waitResponse(120000L, "+UMQTTC: 2,1\r" NL_CHAR NL_CHAR R_OK) !=1 ) return false;
+
+  return true;
+}
+
+/**
+* @brief Disconnect from MQTT broker
+* */
+void iotublox_mqtt_disconnect(void)
+{
+  sendAT("+UMQTTC=0");
+  waitResponse(120000L, "+UMQTTC: 0," NL_CHAR NL_CHAR R_OK);
+  uint8_t mqtt_res = atoi(readStringUntil('\r'));
+  if(mqtt_res != 1)
+  {
+    NRF_LOG_WARNING("MQTT Disonnection error #%d", mqtt_res);
+    NRF_LOG_FLUSH();
+  }
 }
 
 /**
@@ -462,7 +527,7 @@ bool iotublox_init(uint8_t mnoProf, char* rat, uint64_t bandMask0, uint64_t band
   
   // TODO this is a bit ugly -> Accept preferred RAT
   char* _rat   = readStringUntil('\r');
-  uint8_t size_rat_read = strlen(_rat) - 1; // remove \r fromt he end
+  uint8_t size_rat_read = strlen(_rat) - 1; // remove \r from the end
   uint8_t rat1 = atoi(strtok(_rat, ","));
   uint8_t rat2 = atoi(strtok(NULL, "\r"));
 
@@ -560,7 +625,7 @@ bool iotublox_connect(const char* apn)
   sprintf(_command, "+CGDCONT=1,\"IP\",\"%s\"", apn);    // Define PDP context 1
   sendAT(_command);  
   waitResponse(MODEM_TIMEOUT, R_OK);
-  
+
   sendAT("+COPS=0");                                    // Automatic operator selection
   if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
 
@@ -571,6 +636,8 @@ bool iotublox_connect(const char* apn)
     sendAT("+COPS?");
   }
 
+  nrf_delay_ms(100); // breathe
+
   uart_clear();
 
   //sendAT("+CGACT=1,1");                                 // Activate PDP profile/context 1
@@ -578,6 +645,9 @@ bool iotublox_connect(const char* apn)
 
   sendAT("+CGATT=1");                                   // GPRS Attach 
   if (waitResponse(150000L, R_OK) != 1) return false;
+
+  sendAT("+CGCONTRDP=1");
+  waitResponse(150000L, R_OK);
 
   return true;
 }

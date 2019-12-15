@@ -12,7 +12,12 @@
 ## TODO
 
 - [ ] More details about battery etc...
+- [ ] Better URC handler.
 - [ ] Check AT response based on the last chars, in order to avoid missing URCs when after "OK" for example
+
+## Kown issues, limintations
+
+* It can only publish QoS 0 messages.
 
 ## Amazon AWS and MQTT
 

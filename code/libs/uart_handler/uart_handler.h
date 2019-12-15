@@ -52,8 +52,8 @@ void uart_event_handler(void * context, nrf_libuarte_async_evt_t * p_evt)
             bsp_board_led_on(0);
             break;
         case NRF_LIBUARTE_ASYNC_EVT_RX_DATA:
-//            strncat(_buff, p_evt->data.rxtx.p_data, p_evt->data.rxtx.length);
-            strcat(_buff, p_evt->data.rxtx.p_data);
+            strncat(_buff, p_evt->data.rxtx.p_data, p_evt->data.rxtx.length);
+            //strcat(_buff, p_evt->data.rxtx.p_data);
             nrf_libuarte_async_rx_free(p_libuarte, p_evt->data.rxtx.p_data, p_evt->data.rxtx.length);
             break;
         case NRF_LIBUARTE_ASYNC_EVT_TX_DONE:
