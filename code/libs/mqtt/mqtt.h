@@ -147,14 +147,14 @@ bool write(uint8_t header, uint8_t* buf, uint16_t length) {
     bool result = true;
     while((bytesRemaining > 0) && result) {
         bytesToWrite = (bytesRemaining > MQTT_MAX_TRANSFER_SIZE)?MQTT_MAX_TRANSFER_SIZE:bytesRemaining;
-        rc = iot_writeSSL(writeBuf,bytesToWrite);
+        rc = iot_write(writeBuf,bytesToWrite);
         result = (rc == bytesToWrite);
         bytesRemaining -= rc;
         writeBuf += rc;
     }
     return result;
 #else
-    rc = iot_writeSSL(buf+(MQTT_MAX_HEADER_SIZE-hlen),length+hlen);
+    rc = iot_write(buf+(MQTT_MAX_HEADER_SIZE-hlen),length+hlen);
     lastOutActivity = millis();
     return (rc == hlen+length);
 #endif
@@ -250,8 +250,6 @@ bool mqtt_connected() {
             //_client->stop();
             iot_closeSocket(socket.identifier);
         }
-    } else {
-        return _state == MQTT_CONNECTED;
     }
 
     return rc;
@@ -259,7 +257,7 @@ bool mqtt_connected() {
 
 bool mqtt_connect(const char *id, const char *user, const char *pass, const char* willTopic, uint8_t willQos,
                   bool willRetain, const char* willMessage, bool cleanSession){
-    if (!mqtt_connected()) {
+    //if (!mqtt_connected()) {
         int result = 1;    // TODO check connection with the TCP socket here or on iotublox
 
         if (result == 1) {
@@ -328,14 +326,23 @@ bool mqtt_connect(const char *id, const char *user, const char *pass, const char
                 unsigned long t = millis();
                 if (t-lastInActivity >= ((int32_t) MQTT_SOCKET_TIMEOUT*1000UL)) {
                     _state = MQTT_CONNECTION_TIMEOUT;
+                    NRF_LOG_WARNING("MQTT_CONNECTION_TIMEOUT");
+                    NRF_LOG_FLUSH();
                     iot_closeSocket(socket.identifier);//_client->stop();
                     return false;
                 }
             }
-            uint8_t llen;
-            uint16_t len = readPacket(&llen);
 
-            if (len == 4) {
+            iot_readSocket();
+            uint8_t mqttsize = strlen(socket.content);
+            NRF_LOG_INFO("Respons -> %s", socket.content);
+            NRF_LOG_FLUSH();
+            memmove(buffer, socket.content, MQTT_MAX_PACKET_SIZE/*sizeof(buffer)*/);
+
+            uint8_t llen;
+            //uint16_t len = readPacket(&llen);
+
+            if (/*len*/socket.length == 4) {
                 if (buffer[3] == 0) {
                     lastInActivity = millis();
                     pingOutstanding = false;
@@ -350,7 +357,7 @@ bool mqtt_connect(const char *id, const char *user, const char *pass, const char
             _state = MQTT_CONNECT_FAILED;
         }
         return false;
-    }
+    //}
     return true;
 }
 
@@ -366,7 +373,7 @@ bool loop() {
             } else {
                 buffer[0] = MQTTPINGREQ;
                 buffer[1] = 0;
-                iot_writeSSL(buffer,2);
+                iot_write(buffer,2);
                 lastOutActivity = t;
                 lastInActivity = t;
                 pingOutstanding = true;
@@ -396,7 +403,7 @@ bool loop() {
                             buffer[1] = 2;
                             buffer[2] = (msgId >> 8);
                             buffer[3] = (msgId & 0xFF);
-                            iot_writeSSL(buffer,4);
+                            iot_write(buffer,4);
                             lastOutActivity = t;
 
                         } else {
@@ -407,7 +414,7 @@ bool loop() {
                 } else if (type == MQTTPINGREQ) {
                     buffer[0] = MQTTPINGRESP;
                     buffer[1] = 0;
-                    iot_writeSSL(buffer,2);
+                    iot_write(buffer,2);
                 } else if (type == MQTTPINGRESP) {
                     pingOutstanding = false;
                 }
@@ -495,7 +502,7 @@ bool mqtt_unsubscribe(const char* topic) {
 void mqtt_disconnect() {
     buffer[0] = MQTTDISCONNECT;
     buffer[1] = 0;
-    iot_writeSSL(buffer,2);
+    iot_write(buffer,2);
     _state = MQTT_DISCONNECTED;
     //_client->flush();
     //_client->stop();

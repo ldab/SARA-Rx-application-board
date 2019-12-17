@@ -27,6 +27,8 @@ extern "C" {
 
 #include "uart_handler.h"
 
+#include "Certificates.h"
+
 #if !defined( MODEM_RX_BUFFER )
   #define MODEM_RX_BUFFER 255
 #endif
@@ -40,7 +42,7 @@ extern "C" {
 #define NL_CHAR     "\r\n"
 #define R_OK        "OK" NL_CHAR
 #define R_ERROR     "ERROR" NL_CHAR
-#define R_CME_ERROR "+CME ERROR: "  //TODO NL_CHAR check if before
+#define R_CME_ERROR "+CME ERROR: "
 
 #define YIELD() nrf_delay_us(10)
 
@@ -120,13 +122,14 @@ uint8_t waitResponse(uint32_t timeout_ms, char* data)
       } else if (strstr(resp, "+UUSORD: ") != NULL) {
         socket.identifier = atoi(readStringUntil(','));
         socket.length     = atoi(readStringUntil('\r'));
-        NRF_LOG_INFO("### URC Data Received: %i on %i", socket.length, socket.identifier);
+        NRF_LOG_INFO("### URC Data Received: %d on %d", socket.length, socket.identifier);
         NRF_LOG_FLUSH();
       } else if (strstr(resp, "+UUSOCL: ") != NULL) {
         uint8_t _s = uart_read() - '0';
         socket.connected = false;
-        NRF_LOG_INFO("### URC Sock Closed: %i", _s);
+        NRF_LOG_INFO("### URC Sock Closed: %d", _s);
         NRF_LOG_FLUSH();
+        memset(resp, '\0', MODEM_RX_BUFFER);
       }
     }
   } while ((millis() - startMillis ) < timeout_ms);
@@ -197,16 +200,73 @@ char *readStringUntil(char terminator)
 }
 
 /**
-* @brief Create and connect to the socket
+* @brief Create and connect to the socket SSL
 *
 * @param host and port.
 * */
-void iot_connSocket(char* _host, uint16_t _port)
+void iot_connSocketSSL(char* _host, uint16_t _port, cert_t _rootCA, cert_t _clientCert, cert_t _privateKey)
 {
   char _command[255] = "";
 
-  //iot_closeSocket( 0 );
-  //uart_clear();
+/******************* Upload Trust CA *******************************/
+  if(_rootCA.size > 0){
+    sprintf(_command, "+USECMNG=0,0,\"%s\",%d", _rootCA.name, _rootCA.size);
+    sendAT(_command);
+
+    nrf_delay_ms(100); // breathe -> without it the DATA > did not happen.
+
+    uart_write_bin(_rootCA.data, _rootCA.size);
+
+    sprintf(_command, "+USECMNG: 0,0,\"%s\",", _rootCA.name);
+    waitResponse(MODEM_TIMEOUT, _command);
+    waitResponse(MODEM_TIMEOUT, R_OK);                      // Just to clear buffer
+
+    sprintf(_command, "+USECPRF=0,3,\"%s\"", _rootCA.name);
+    sendAT(_command);           // Set Root Certificate internal name
+    waitResponse(MODEM_TIMEOUT, R_OK);
+  }
+/******************************************************************************/
+
+/******************* Upload Client Certificate *******************************/
+  if(_clientCert.size > 0){
+    sprintf(_command, "+USECMNG=0,1,\"%s\",%d", _clientCert.name, _clientCert.size);
+    sendAT(_command);
+
+    nrf_delay_ms(100); // breathe -> without it the DATA > did not happen.
+
+    uart_write_bin(_clientCert.data, _clientCert.size);
+
+    sprintf(_command, "+USECMNG: 0,1,\"%s\",", _clientCert.name);
+    waitResponse(MODEM_TIMEOUT, _command);
+    waitResponse(MODEM_TIMEOUT, R_OK);                      // Just to clear buffer
+
+    sprintf(_command, "+USECPRF=0,5,\"%s\"", _clientCert.name);
+    sendAT(_command);           // Set Root Certificate internal name
+    waitResponse(MODEM_TIMEOUT, R_OK);
+  }
+/******************************************************************************/
+
+/******************* Upload Private Key *******************************/
+  if(_privateKey.size > 0 ){
+    sprintf(_command, "+USECMNG=0,2,\"%s\",%d", _privateKey.name, _privateKey.size);
+    sendAT(_command);
+
+    nrf_delay_ms(100); // breathe -> without it the DATA > did not happen.
+
+    uart_write_bin(_privateKey.data, _privateKey.size);
+
+    sprintf(_command, "+USECMNG: 0,2,\"%s\",", _privateKey.name);
+    waitResponse(MODEM_TIMEOUT, _command);
+    waitResponse(MODEM_TIMEOUT, R_OK);                      // Just to clear buffer
+
+    sprintf(_command, "+USECPRF=0,6,\"%s\"", _privateKey.name);
+    sendAT(_command);           // Set Root Certificate internal name
+    waitResponse(MODEM_TIMEOUT, R_OK);
+  }
+/******************************************************************************/
+
+  sendAT("+USECPRF=0,1,3");   // SSL/TLS version to use -> 3 == TLS1.2
+  waitResponse(MODEM_TIMEOUT, R_OK);
 
   sendAT("+UDCONF=1,1");                                  // Enable HEX mode
   waitResponse(MODEM_TIMEOUT, R_OK);
@@ -217,8 +277,44 @@ void iot_connSocket(char* _host, uint16_t _port)
 
   nrf_delay_ms(100); // breath
 
-  sprintf(_command, "+USOSEC=%i,1,0", socket.identifier);
+  sprintf(_command, "+USOSEC=%d,1,0", socket.identifier);
   sendAT(_command);                                       // Enable SSL on TCP on socket open previously
+  waitResponse(MODEM_TIMEOUT, R_OK);
+
+  nrf_delay_ms(100); // breath
+
+  sprintf(_command, "+USOCO=%i,\"%s\",%d", socket.identifier, _host, _port);
+  sendAT(_command);                                       // Connect to the Socket
+  if(waitResponse(120000L, R_OK) == 1)
+    socket.connected = true;
+  else
+  {
+    iot_closeSocket(socket.identifier);
+    uart_clear();
+  }
+
+}
+
+/**
+* @brief Create and connect to the socket
+*
+* @param host and port.
+* */
+void iot_connSocket(char* _host, uint16_t _port)
+{
+  char _command[255] = "";
+
+  sendAT("+UDCONF=1,1");                                  // Enable HEX mode
+  waitResponse(MODEM_TIMEOUT, R_OK);
+
+  sendAT("+USOCR=6");                                     // Create TCP Socket
+  waitResponse(MODEM_TIMEOUT, "+USOCR: ");
+  socket.identifier = atoi(readStringUntil('\r'));
+
+  nrf_delay_ms(100); // breath
+
+  sprintf(_command, "+USOSEC=%i,0", socket.identifier);
+  sendAT(_command);                                       // Disable SSL on TCP on socket open previously
   waitResponse(MODEM_TIMEOUT, R_OK);
 
   nrf_delay_ms(100); // breath
@@ -242,7 +338,7 @@ void iot_connSocket(char* _host, uint16_t _port)
 *
 * @return true if succesful.
 * */
-bool iot_writeSSL(const char* data, uint16_t size)
+bool iot_write(const char* data, uint16_t size)
 {
   char _command[512 + 20] = "";
   sprintf(_command, "+USOWR=%i,%i,\"", socket.identifier, size);
@@ -284,13 +380,13 @@ void iot_closeSocket(uint8_t _socket)
 /**
 * @brief Read data from the socket.
 *
-* @return true if succesful.
+* @return true if successful.
 * */
 bool iot_readSocket(void)
 {
   waitResponse(120000L, "+UUSORD:");  // Example: +UUSORD: 0,1024
-  socket.identifier = atoi(readStringUntil(','));  // TODO check if leading space convert to Int alright
-  socket.length     = atoi(readStringUntil('\n')); // the same as above \r\n
+  socket.identifier = atoi(readStringUntil(','));
+  socket.length     = atoi(readStringUntil('\n'));
 
   char _command[13 + 1]    = "";      // Example AT+USORD=0,1024
   char sock_data[1024 + 1] = "";      // Max socket length is 1024, when HEX == 512
@@ -334,7 +430,7 @@ bool iot_readSocket(void)
     socket.content[i] = (n1 << 4) | n2;
   }
 
-  socket.length = 0;
+  //socket.length = 0;
   return true;
 }
 
@@ -410,7 +506,7 @@ bool iotublox_mqtt_publish(const char* topic, const char* payload, uint8_t QoS)
 void iotublox_mqtt_disconnect(void)
 {
   sendAT("+UMQTTC=0");
-  waitResponse(120000L, "+UMQTTC: 0," NL_CHAR NL_CHAR R_OK);
+  waitResponse(120000L, "+UMQTTC: 0,");
   uint8_t mqtt_res = atoi(readStringUntil('\r'));
   if(mqtt_res != 1)
   {
