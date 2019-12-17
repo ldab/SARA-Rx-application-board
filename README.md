@@ -1,70 +1,42 @@
-# SARA-R5 application board
+# SARA-Rx application board
 
- SARA-R5 NB-IoT + Cat-M1 + GNSS application board
+ SARA-R4 NB-IoT + Cat-M1 + GNSS application board - NINA-B3 with Secure MQTT
 
-[![GitHub version](https://img.shields.io/github/release/ldab/SARA-R5-application-board.svg)](https://github.com/ldab/SARA-R5-application-board/releases/latest)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/ldab/SARA-R5-application-board/blob/master/LICENSE)
+[![GitHub version](https://img.shields.io/github/release/ldab/SARA-Rx-application-board.svg)](https://github.com/ldab/SARA-Rx-application-board/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/ldab/SARA-Rx-application-board/blob/master/LICENSE)
 
-[![GitHub last commit](https://img.shields.io/github/last-commit/ldab/SARA-R5-application-board.svg?style=social)](https://github.com/ldab/SARA-R5-application-board)
-
-![PCB](./pics/esp_pmc_pcb.png)
+[![GitHub last commit](https://img.shields.io/github/last-commit/ldab/SARA-Rx-application-board.svg?style=social)](https://github.com/ldab/SARA-Rx-application-board)
 
 ## TODO
 
 - [ ] More details about battery etc...
-- [ ] Better URC handler.
+- [ ] !!! Better Socket close URC handler.
 - [ ] Check AT response based on the last chars, in order to avoid missing URCs when after "OK" for example
+- [ ] Implement Subscribe;
 
-## Kown issues, limintations
+![](./pics/mqtt_RTT-print.png)
 
-* It can only publish QoS 0 messages.
+## Nordic SDK
+
+* This is based on nRF5_SDK_16.0.0_98a08e2, get yours here: https://www.nordicsemi.com/Software-and-tools/Software/nRF5-SDK/Download
 
 ## Amazon AWS and MQTT
+
+1. Sign in to the AWS IoT Console
+2. Register a Device in the Registry
+3. Configure Your Device
+4. View Device MQTT Messages with the AWS IoT MQTT Client
 
 https://docs.aws.amazon.com/iot/latest/developerguide/iot-gs.html
 
 ## Running the code locally
 
-https://devzone.nordicsemi.com/f/nordic-q-a/44638/how-to-move-an-sdk-example-out-of-the-sdk-tree
+1. Clone this repo to a local folder ```> git clone https://github.com/ldab/SARA-Rx-application-board```
+2. Point the `$(SDK)` @`./code/ninab3/blank/ses/libuarte_pca10056.emProject` to where you have installed Nordic SDK, for example `C:\nRF\nRF5_SDK_16.0.0_98a08e2`
+3. Like so: `macros="CMSIS_CONFIG_TOOL=C:/nRF/nRF5_SDK_16.0.0_98a08e2/external_tools/cmsisconfig/CMSIS_Configuration_Wizard.jar;SDK=C:/nRF/nRF5_SDK_16.0.0_98a08e2"`
+4. Open the SEGGER Embedded Studio project file located in `./code/ninab3/blank/ses/libuarte_pca10056.emProject`
 
-~~macros="CMSIS_CONFIG_TOOL=.../../../../../../external_tools/cmsisconfig/CMSIS_Configuration_Wizard.jar;"~~
-
-`macros="CMSIS_CONFIG_TOOL=C:/nRF/nRF5_SDK_15.2.0_9412b96/external_tools/cmsisconfig/CMSIS_Configuration_Wizard.jar;SDK=C:/nRF/nRF5_SDK_15.2.0_9412b96"`
-
-I changed ALL occurrences of "../../../../../.." to $(SDK)
-
-## Compile the software on SDK folder
-
-* Clone this repository   
-```> git clone https://github.com/ldab/...```
-
-* Download the source code for nRF5_SDK_16.0.0_98a08e2 from Nordic Semi
-
-* Copy ```custom_board.h``` to the ```/components/boards``` folder of the SDK
-
-* Copy the folder ```code``` to the ```/example``` folder of the SDK
-
-* Open the SEGGER Embedded Studio project file located in ```code\ninab3\blank\ses\```
-
-## ATSAMD21E Variant
-
-* When using I2C, it may conflict with SERCOM2 PA 14 and 15, change handler to SERCOM0 at `\.platformio\packages\framework-arduinosam\variants\trinket_m0\variant.h`
-
-```
-#define PERIPH_WIRE          sercom0
-#define WIRE_IT_HANDLER      SERCOM0_Handler
-```
-
-* And disable SERCOM0 at the end of `\.platformio\packages\framework-arduinosam\variants\trinket_m0\variant.cpp` SERCOM0 -> PA 06 and 07 are used for something else.
-
-```
-/*Uart Serial1( &sercom0, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX ) ;
-
-void SERCOM0_Handler()
-{
-  Serial1.IrqHandler();
-}*/
-```
+Ref. https://devzone.nordicsemi.com/f/nordic-q-a/44638/how-to-move-an-sdk-example-out-of-the-sdk-tree
 
 ## Efficiency
 
@@ -72,24 +44,36 @@ void SERCOM0_Handler()
 
 ## Schematic
 
-<img src="./schematic.png" width="75%"> 
+[![Board BOM](./pics/BOM.png)](./KiCad/BOM.csv)
+
+## PCB
+
+<img src="./pics/pcb.png" alt="3D PCB" width="50%"> 
 
 ## BOM
 
-[ESP Battery pmb](./KiCad/BOM.csv)
+[![Board BOM](./pics/BOM.png)](./KiCad/BOM.csv)
 
 ## Enclosure
 
 <img src="./pics/enclosure.png" alt="3D" width="50%"> 
 
+## Kown issues, limintations
+
+* MQTT Socket Implementaition can only **publish** QoS 0 messages.
+
 ## Final Thoughts or Improvements
 
-* Use STATUS 2 of AEM10941 as lst grasp;
+* Use STATUS 2 of AEM10941 as last grasp;
 * Supply NINA from the same 3.xV from the Boost Converter;
 * Control boost converter EN, in order to turn SARA Off;
 * SARA RESET Pin access;
-* Open Drain 74LVC3G07 buffer on NINA RGB, in order to avoid leak.
+* Open Drain 74LVC3G07 buffer on NINA RGB, in order to avoid leakage.
 
 ## Credits
 
-GitHub Shields and Badges created with [Shields.io](https://github.com/badges/shields/)
+* [MQTTBox](http://workswithweb.com/mqttbox.html) for Windows in order to communicate with the broker and check messages;
+* [CloudMQTT](https://www.cloudmqtt.com/) Free Cloud Broker;
+* MQTT implementation inspired and based on [knolleary PubSub Client](https://github.com/knolleary/pubsubclient);
+* AT Commands implementation inspired on [vshymanskyy TinyGSM](https://github.com/vshymanskyy/TinyGSM);
+* GitHub Shields and Badges created with [Shields.io](https://github.com/badges/shields/);

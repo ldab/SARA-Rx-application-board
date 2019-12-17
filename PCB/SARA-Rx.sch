@@ -795,7 +795,7 @@ P 3700 2800
 AR Path="/5D711B00" Ref="U?"  Part="1" 
 AR Path="/5D6EA84C/5D711B00" Ref="U9"  Part="1" 
 F 0 "U9" H 3100 4300 50  0000 C CNN
-F 1 "SARA-R511M" H 3300 4200 50  0000 C CNN
+F 1 "SARA-Rx" H 3300 4200 50  0000 C CNN
 F 2 "RF_GSM:ublox_SARA-G3_LGA-96" H 4400 1250 50  0001 C CNN
 F 3 "https://www.u-blox.com/sites/default/files/SARA-R5_ProductSummary_%28UBX-18051286%29.pdf" H 3700 2800 50  0001 C CNN
 F 4 "NA" H 3700 2800 50  0001 C CNN "LCSC Part Number"
@@ -1126,8 +1126,6 @@ $EndComp
 Wire Wire Line
 	7400 2925 7400 2875
 NoConn ~ 3650 1350
-Text Notes 3400 4525 2    50   ~ 0
-SECONDARY UART????\n
 $Comp
 L Connector:TestPoint TP?
 U 1 1 5D8A4722

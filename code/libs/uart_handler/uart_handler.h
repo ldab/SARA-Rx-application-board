@@ -151,4 +151,34 @@ void uart_write(char *data)
   }
 }
 
+void uart_write_bin(char *data, size_t size)
+{
+  ret_code_t ret = -1;
+  
+  while(ret != NRF_SUCCESS) ret = nrf_libuarte_async_tx(&modem_uart, data, size);
+
+  if (ret == NRF_ERROR_BUSY)
+  {
+      buffer_t buf = {
+          .p_data = data,
+          .length = size,
+      };
+
+      ret = nrf_queue_push(&m_buf_queue, &buf);
+      APP_ERROR_CHECK(ret);
+  }
+  else
+  {
+      APP_ERROR_CHECK(ret);
+  }
+  while (!nrf_queue_is_empty(&m_buf_queue))
+  {    
+      bsp_board_led_invert(1);
+      buffer_t _b;
+      ret = nrf_queue_pop(&m_buf_queue, &_b);
+      APP_ERROR_CHECK(ret);
+      UNUSED_RETURN_VALUE(nrf_libuarte_async_tx(&modem_uart, _b.p_data, _b.length));
+  }
+}
+
 #endif
