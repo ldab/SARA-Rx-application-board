@@ -28,19 +28,20 @@
 #include "iotublox.h"
 #include "mqtt.h"
 
-#define MQTT_HOST     "m24.cloudmqtt.com"
-#define MQTT_PORT     17603
-#define MQTT_PORT_SSL 27603
-#define MQTT_ID       "n928y23dj09u20"
-#define MQTT_USER     "qvpgdxqg"
-#define MQTT_PASS     "YVTESIVDgHlN"
-
-//#define MQTT_HOST     "a2jzp6o827zjxz-ats.iot.us-east-2.amazonaws.com"
+//#define MQTT_HOST     "m24.cloudmqtt.com"
 //#define MQTT_PORT     17603
-//#define MQTT_PORT_SSL 8883
+//#define MQTT_PORT_SSL 27603
 //#define MQTT_ID       "n928y23dj09u20"
-//#define MQTT_USER     ""
-//#define MQTT_PASS     ""
+//#define MQTT_USER     "qvpgdxqg"
+//#define MQTT_PASS     "YVTESIVDgHlN"
+
+#define MQTT_HOST     "a2jzp6o827zjxz-ats.iot.us-east-2.amazonaws.com"
+#define MQTT_PORT     17603
+#define MQTT_PORT_SSL 8883
+#define HTTP_PORT_SSL 8443
+#define MQTT_ID       "n928y23dj09u20"
+#define MQTT_USER     ""
+#define MQTT_PASS     ""
 
 static void sleep_handler(void)
 {
@@ -93,8 +94,8 @@ int main(void)
 
     iotublox_init(100, "8", 524420, 524420);
     iotublox_powerSave(false, false, NULL, NULL);
-    //iotublox_connect("company.iot.dk1.tdc");
-    iotublox_connect("lpwa.telia.iot");
+    iotublox_connect("company.iot.dk1.tdc");
+    //iotublox_connect("lpwa.telia.iot");
 
     while (true)
     {
@@ -104,21 +105,20 @@ int main(void)
         iot_closeSocket( 0 );
         uart_clear();
 
-        cert_t untrol_CERT[]={0,0,0};
-
-        /***************************** GET Secure Example using AT Commands API*****************************************/
+        /***************************** POST Secure Example using AT Commands API*****************************************/
           do{
-            iot_connSocketSSL("untrol.blynk.cc", 443, untrol_CERT[0], untrol_CERT[1], untrol_CERT[2]);
+            iot_connSocketSSL(MQTT_HOST, HTTP_PORT_SSL, AWS_CERTS[0], AWS_CERTS[1], AWS_CERTS[2]);
             }while(socket.connected == false);
 
-          //char GET[] = "GET /ENaXVkhOawt3DJm80zrgIiCIkeGxecGF/get/V6 HTTP/1.1\n\rHost: untrol.blynk.cc\n\rConnection: close\n\r\n\r";
-          char GET[] = "GET /ENaXVkhOawt3DJm80zrgIiCIkeGxecGF/get/V6 HTTP/1.1\n\r\n\r";
-          iot_write(GET, strlen(GET));
+          char post_content[] = "{ \"message\": \"Hello, world\" }";
+          char POST[1024] = "";
+          sprintf(POST, "POST /topics/nina/test HTTP/1.1\nHost: %s:%d\nUser-Agent: Arduino/1.0\nContent-Type: application/x-www-form-urlencoded\nContent-Length: %d\n\n%s\n\n", MQTT_HOST, HTTP_PORT_SSL, strlen(post_content), post_content);
+          iot_write(POST, strlen(POST));
           iot_readSocket();
 
-          char* response = strstr(socket.content, "\r\n\r\n") + 4;       // Filter HTTP response
+          //char* response = strstr(socket.content, "\r\n\r\n") + 4;       // Filter HTTP response
 
-          NRF_LOG_INFO("Respons -> %s", response);
+          NRF_LOG_INFO("Respons -> %s", socket.content);
           NRF_LOG_FLUSH();
 
           iot_closeSocket(socket.identifier);
@@ -152,11 +152,11 @@ int main(void)
         if( !nrf_gpio_pin_read(BUTTON_1) )
         {
           do{
-            iot_connSocketSSL(MQTT_HOST, MQTT_PORT_SSL, CloudMQTT_CERTS[0], CloudMQTT_CERTS[1], CloudMQTT_CERTS[2]);
-            //iot_connSocketSSL(MQTT_HOST, MQTT_PORT_SSL, AWS_CERTS[0], AWS_CERTS[1], AWS_CERTS[2]);
+            //iot_connSocketSSL(MQTT_HOST, MQTT_PORT_SSL, CloudMQTT_CERTS[0], CloudMQTT_CERTS[1], CloudMQTT_CERTS[2]);
+            iot_connSocketSSL(MQTT_HOST, MQTT_PORT_SSL, AWS_CERTS[0], AWS_CERTS[1], AWS_CERTS[2]);
             }while(socket.connected == false);
 
-          mqtt_connect(MQTT_ID, MQTT_USER, MQTT_PASS, 0, 0, 0, 0, 1);
+          mqtt_connect(MQTT_ID, MQTT_USER, MQTT_PASS, 0, 0, 0, 0, true);
           mqtt_publish("nina/test", "This is secure", false);
        /***********************************************************************************************************/
 
