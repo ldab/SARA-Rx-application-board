@@ -16,6 +16,20 @@
 
 ![](./pics/mqtt_RTT-print.png)
 
+## Energy Budget
+
+* 120mA active current;
+* Code takes 15 seconds to execute;
+* Wakes every hour;
+* 2mA Sleep current *This needs to be optimized*;
+* 10 hours of light available;
+* V charge ready = 3.67V;
+* V Over discharge = 3.6V;
+* V Over charge = 4.12V;
+
+**Source Power Required = 34mW**
+**Storage Required = 42.28mAh**
+
 ## Nordic SDK
 
 * This is based on nRF5_SDK_16.0.0_98a08e2, get yours here: https://www.nordicsemi.com/Software-and-tools/Software/nRF5-SDK/Download
