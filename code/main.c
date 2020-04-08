@@ -73,8 +73,8 @@ int main(void)
 
     nrf_gpio_cfg_input(ARDUINO_6_PIN, NRF_GPIO_PIN_PULLUP);   // SW3, user button
     nrf_gpio_cfg_input(ARDUINO_A2_PIN, NRF_GPIO_PIN_PULLUP);  // V_INT input
-    nrf_gpio_cfg_input(BUTTON_2, NRF_GPIO_PIN_PULLUP);        // EVK button
-    nrf_gpio_cfg_input(BUTTON_1, NRF_GPIO_PIN_PULLUP);        // EVK button
+    //nrf_gpio_cfg_input(BUTTON_2, NRF_GPIO_PIN_PULLUP);        // EVK button
+    //nrf_gpio_cfg_input(BUTTON_1, NRF_GPIO_PIN_PULLUP);        // EVK button
     nrf_gpio_cfg_output(ARDUINO_A1_PIN);                      // PWR_ON Pin, active High
     
     // Function starting the internal low-frequency clock LFCLK XTAL oscillator.
@@ -93,6 +93,15 @@ int main(void)
     NRF_LOG_INFO("%s", welcome);
     NRF_LOG_FLUSH();
 
+    while( nrf_gpio_pin_read(BUTTON_3) )
+    {
+      NRF_LOG_INFO("Press the button, it is = %d", nrf_gpio_pin_read(BUTTON_3));NRF_LOG_FLUSH();
+      bsp_board_led_invert(0);
+      nrf_delay_ms(200);
+      bsp_board_led_invert(1);
+      nrf_delay_ms(200);
+    }
+
           twi_init();
           float    temperature; // temperature
           float    humidity;    // relative humidity
@@ -102,6 +111,8 @@ int main(void)
           nrf_delay_ms(2000);
           NRF_LOG_INFO("Good night"); NRF_LOG_FLUSH();
           SHTC3_Sleep();
+
+    bsp_board_leds_off();
 
     iotublox_init(100, "8", 524420, 524420);
     iotublox_powerSave(false, false, NULL, NULL);
