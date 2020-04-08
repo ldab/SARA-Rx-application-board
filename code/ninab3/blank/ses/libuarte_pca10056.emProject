@@ -16,7 +16,7 @@
       arm_target_device_name="nRF52840_xxAA"
       arm_target_interface_type="SWD"
       c_preprocessor_definitions="APP_TIMER_V2;APP_TIMER_V2_RTC1_ENABLED;BOARD_CUSTOM;BSP_DEFINES_ONLY;CONFIG_GPIO_AS_PINRESET;FLOAT_ABI_HARD;INITIALIZE_USER_SECTIONS;NO_VTOR_CONFIG;NRF52840_XXAA"
-      c_user_include_directories="../../../config;$(SDK)/components;$(SDK)/components/boards;$(SDK)/components/drivers_nrf/nrf_soc_nosd;$(SDK)/components/libraries/atomic;$(SDK)/components/libraries/atomic_fifo;$(SDK)/components/libraries/balloc;$(SDK)/components/libraries/bsp;$(SDK)/components/libraries/delay;$(SDK)/components/libraries/experimental_section_vars;$(SDK)/components/libraries/libuarte;$(SDK)/components/libraries/log;$(SDK)/components/libraries/log/src;$(SDK)/components/libraries/memobj;$(SDK)/components/libraries/queue;$(SDK)/components/libraries/ringbuf;$(SDK)/components/libraries/scheduler;$(SDK)/components/libraries/sortlist;$(SDK)/components/libraries/strerror;$(SDK)/components/libraries/timer;$(SDK)/components/libraries/util;$(SDK)/components/toolchain/cmsis/include;../../..;$(SDK)/external/fprintf;$(SDK)/external/segger_rtt;$(SDK)/integration/nrfx;$(SDK)/integration/nrfx/legacy;$(SDK)/modules/nrfx;$(SDK)/modules/nrfx/drivers/include;$(SDK)/modules/nrfx/hal;$(SDK)/modules/nrfx/mdk;../config;../../../libs/iotublox/;../../../libs/uart_handler/;../../../libs/mqtt/;../../../../Certificates/"
+      c_user_include_directories="../../../config;$(SDK)/components;$(SDK)/components/boards;$(SDK)/components/drivers_nrf/nrf_soc_nosd;$(SDK)/components/libraries/atomic;$(SDK)/components/libraries/atomic_fifo;$(SDK)/components/libraries/balloc;$(SDK)/components/libraries/bsp;$(SDK)/components/libraries/delay;$(SDK)/components/libraries/experimental_section_vars;$(SDK)/components/libraries/libuarte;$(SDK)/components/libraries/log;$(SDK)/components/libraries/log/src;$(SDK)/components/libraries/memobj;$(SDK)/components/libraries/queue;$(SDK)/components/libraries/ringbuf;$(SDK)/components/libraries/scheduler;$(SDK)/components/libraries/sortlist;$(SDK)/components/libraries/strerror;$(SDK)/components/libraries/timer;$(SDK)/components/libraries/util;$(SDK)/components/toolchain/cmsis/include;../../..;$(SDK)/external/fprintf;$(SDK)/external/segger_rtt;$(SDK)/integration/nrfx;$(SDK)/integration/nrfx/legacy;$(SDK)/modules/nrfx;$(SDK)/modules/nrfx/drivers/include;$(SDK)/modules/nrfx/hal;$(SDK)/modules/nrfx/mdk;../config;../../../libs/iotublox/;../../../libs/uart_handler/;../../../libs/mqtt/;../../../libs/shtc3/;../../../../Certificates/"
       debug_register_definition_file="$(SDK)/modules/nrfx/mdk/nrf52840.svd"
       debug_start_from_entry_point_symbol="No"
       debug_target_connection="J-Link"
@@ -69,6 +69,9 @@
     </folder>
     <folder Name="nRF_Drivers">
       <file file_name="$(SDK)/integration/nrfx/legacy/nrf_drv_clock.c" />
+      <file file_name="$(SDK)/integration/nrfx/legacy/nrf_drv_twi.c" />
+      <file file_name="$(SDK)/modules/nrfx/drivers/src/nrfx_twi.c" />
+      <file file_name="$(SDK)/modules/nrfx/drivers/src/nrfx_twim.c" />
       <file file_name="$(SDK)/components/drivers_nrf/nrf_soc_nosd/nrf_nvic.c" />
       <file file_name="$(SDK)/components/drivers_nrf/nrf_soc_nosd/nrf_soc.c" />
       <file file_name="$(SDK)/modules/nrfx/soc/nrfx_atomic.c" />
@@ -95,6 +98,7 @@
       <file file_name="../../../libs/iotublox/iotublox.h" />
       <file file_name="../../../libs/uart_handler/uart_handler.h" />
       <file file_name="../../../libs/mqtt/mqtt.h" />
+      <file file_name="../../../libs/shtc3/shtc3.h" />
     </folder>
     <folder Name="Certificates">
       <file file_name="../../../../Certificates/Certificates.h" />

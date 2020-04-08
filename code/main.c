@@ -27,6 +27,7 @@
 
 #include "iotublox.h"
 #include "mqtt.h"
+#include "shtc3.h"
 
 //#define MQTT_HOST     "m24.cloudmqtt.com"
 //#define MQTT_PORT     17603
@@ -91,6 +92,16 @@ int main(void)
 
     NRF_LOG_INFO("%s", welcome);
     NRF_LOG_FLUSH();
+
+          twi_init();
+          float    temperature; // temperature
+          float    humidity;    // relative humidity
+          SHTC3_getID();
+          SHTC3_GetTempAndHumiPolling(&temperature, &humidity);
+          NRF_LOG_INFO("Temp: " NRF_LOG_FLOAT_MARKER "°C and Hum: " NRF_LOG_FLOAT_MARKER "%%", NRF_LOG_FLOAT(temperature), NRF_LOG_FLOAT(humidity)); NRF_LOG_FLUSH();
+          nrf_delay_ms(2000);
+          NRF_LOG_INFO("Good night"); NRF_LOG_FLUSH();
+          SHTC3_Sleep();
 
     iotublox_init(100, "8", 524420, 524420);
     iotublox_powerSave(false, false, NULL, NULL);
