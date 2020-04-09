@@ -72,7 +72,7 @@ int main(void)
     bsp_board_init(BSP_INIT_LEDS);
 
     nrf_gpio_cfg_input(ARDUINO_6_PIN, NRF_GPIO_PIN_PULLUP);   // SW3, user button
-    nrf_gpio_cfg_input(ARDUINO_A2_PIN, NRF_GPIO_PIN_PULLUP);  // V_INT input
+    nrf_gpio_cfg_input(BUTTON_1, NRF_GPIO_PIN_PULLUP);  // V_INT input
     //nrf_gpio_cfg_input(BUTTON_2, NRF_GPIO_PIN_PULLUP);        // EVK button
     //nrf_gpio_cfg_input(BUTTON_1, NRF_GPIO_PIN_PULLUP);        // EVK button
     nrf_gpio_cfg_output(ARDUINO_A1_PIN);                      // PWR_ON Pin, active High
@@ -93,9 +93,9 @@ int main(void)
     NRF_LOG_INFO("%s", welcome);
     NRF_LOG_FLUSH();
 
-    while( nrf_gpio_pin_read(BUTTON_3) )
+    while( nrf_gpio_pin_read(BUTTON_1) )
     {
-      NRF_LOG_INFO("Press the button, it is = %d", nrf_gpio_pin_read(BUTTON_3));NRF_LOG_FLUSH();
+      NRF_LOG_INFO("Press the button, it is = %d", nrf_gpio_pin_read(BUTTON_1));NRF_LOG_FLUSH();
       bsp_board_led_invert(0);
       nrf_delay_ms(200);
       bsp_board_led_invert(1);
@@ -121,7 +121,7 @@ int main(void)
 
     while (true)
     {
-        if( !nrf_gpio_pin_read(BUTTON_2) )
+        if( !nrf_gpio_pin_read(BUTTON_1) )
         {
         
         iot_closeSocket( 0 );
