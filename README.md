@@ -50,6 +50,8 @@ https://docs.aws.amazon.com/iot/latest/developerguide/iot-gs.html
 3. Like so: `macros="CMSIS_CONFIG_TOOL=C:/nRF/nRF5_SDK_16.0.0_98a08e2/external_tools/cmsisconfig/CMSIS_Configuration_Wizard.jar;SDK=C:/nRF/nRF5_SDK_16.0.0_98a08e2"`
 4. Open the SEGGER Embedded Studio project file located in `./code/ninab3/blank/ses/libuarte_pca10056.emProject`
 
+* PS. don't forget to set the NFC Pins as GPIO on the Preprocessor: `CONFIG_NFCT_PINS_AS_GPIOS`
+
 Ref. https://devzone.nordicsemi.com/f/nordic-q-a/44638/how-to-move-an-sdk-example-out-of-the-sdk-tree
 
 ## Efficiency
@@ -79,9 +81,9 @@ Ref. https://devzone.nordicsemi.com/f/nordic-q-a/44638/how-to-move-an-sdk-exampl
 ## Final Thoughts or Improvements
 
 * Use STATUS 2 of AEM10941 as last grasp;
-* Supply NINA from the same 3.xV from the Boost Converter;
 * Control boost converter EN, in order to turn SARA Off;
 * SARA RESET Pin access;
+* Use 101b AEM10941 Configuration in order to Vovdis = 3.0V givin extra ~20% battery (?).
 * Open Drain 74LVC3G07 buffer on NINA RGB, in order to avoid leakage.
 
 ## Credits

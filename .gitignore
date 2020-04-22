@@ -37,3 +37,5 @@ fp-info-cache
 *.ses
 
 PCB/fp-lib-table
+PCB/sara-rx-ab-rescue.dcm
+PCB/sym-lib-table

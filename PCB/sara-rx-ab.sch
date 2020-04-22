@@ -6,10 +6,10 @@ $Descr A4 11693 8268
 encoding utf-8
 Sheet 1 4
 Title ""
-Date "lun. 30 mars 2015"
-Rev ""
-Comp ""
-Comment1 ""
+Date "2020-04-22"
+Rev "0.1.0"
+Comp "More Electronics"
+Comment1 "Leonardo Bispo"
 Comment2 ""
 Comment3 ""
 Comment4 ""
@@ -99,18 +99,6 @@ NoConn ~ 10800 850
 NoConn ~ 10900 850 
 NoConn ~ 11000 850 
 NoConn ~ 11100 850 
-$Comp
-L Connector_Generic:Conn_01x08 P3
-U 1 1 56D7164F
-P 10000 2600
-F 0 "P3" H 10000 2100 50  0000 C CNN
-F 1 "Digital" V 10100 2600 50  0000 C CNN
-F 2 "Socket_Arduino_Uno:Socket_Strip_Arduino_1x08" V 10150 2550 20  0000 C CNN
-F 3 "" H 10000 2600 50  0000 C CNN
-F 4 "???" H 10000 2600 50  0001 C CNN "LCSC Part Number"
-	1    10000 2600
-	-1   0    0    -1  
-$EndComp
 Wire Notes Line
 	8350 825  9750 825 
 Wire Notes Line
@@ -538,20 +526,6 @@ Wire Wire Line
 	7050 3650 7125 3650
 NoConn ~ 6250 4150
 NoConn ~ 7050 4150
-$Comp
-L Logic_LevelTranslator:TXB0108DQSR U3
-U 1 1 5D9BC42C
-P 6650 4050
-F 0 "U3" H 6500 3275 50  0000 C CNN
-F 1 "TXS0108EPWR" H 6300 3350 50  0000 C CNN
-F 2 "Package_SO:SSOP-20_4.4x6.5mm_P0.65mm" H 6650 3300 50  0001 C CNN
-F 3 "http://www.ti.com/lit/ds/symlink/txb0108.pdf" H 6650 3950 50  0001 C CNN
-F 4 "TXS0108EPWR" H 6650 4050 50  0001 C CNN "Field4"
-F 5 "C17206" H 6650 4050 50  0001 C CNN "LCSC Part Number"
-F 6 "TXS0108EPWR" H 6650 4050 50  0001 C CNN "Manufacturer_Part_Number"
-	1    6650 4050
-	-1   0    0    -1  
-$EndComp
 $Sheet
 S 8450 3525 1300 1450
 U 5D6EA84C
@@ -866,45 +840,6 @@ F 6 "BLM18EG221SN1D" H 1275 5300 50  0001 C CNN "Manufacturer_Part_Number"
 	1    0    0    -1  
 $EndComp
 $Comp
-L power:+2V5 #PWR?
-U 1 1 5D9D8BAD
-P 9150 1450
-AR Path="/5D6A7059/5D9D8BAD" Ref="#PWR?"  Part="1" 
-AR Path="/5D9D8BAD" Ref="#PWR040"  Part="1" 
-F 0 "#PWR040" H 9150 1300 50  0001 C CNN
-F 1 "+2V5" H 9165 1623 50  0000 C CNN
-F 2 "" H 9150 1450 50  0001 C CNN
-F 3 "" H 9150 1450 50  0001 C CNN
-	1    9150 1450
-	1    0    0    -1  
-$EndComp
-$Comp
-L power:+2V5 #PWR?
-U 1 1 5D940882
-P 1650 3275
-AR Path="/5D6A7059/5D940882" Ref="#PWR?"  Part="1" 
-AR Path="/5D940882" Ref="#PWR09"  Part="1" 
-F 0 "#PWR09" H 1650 3125 50  0001 C CNN
-F 1 "+2V5" H 1665 3448 50  0000 C CNN
-F 2 "" H 1650 3275 50  0001 C CNN
-F 3 "" H 1650 3275 50  0001 C CNN
-	1    1650 3275
-	1    0    0    -1  
-$EndComp
-$Comp
-L power:+2V5 #PWR?
-U 1 1 5D94C40F
-P 6000 3000
-AR Path="/5D6A7059/5D94C40F" Ref="#PWR?"  Part="1" 
-AR Path="/5D94C40F" Ref="#PWR025"  Part="1" 
-F 0 "#PWR025" H 6000 2850 50  0001 C CNN
-F 1 "+2V5" H 6015 3173 50  0000 C CNN
-F 2 "" H 6000 3000 50  0001 C CNN
-F 3 "" H 6000 3000 50  0001 C CNN
-	1    6000 3000
-	1    0    0    -1  
-$EndComp
-$Comp
 L custom:HT42B534-MSOP U5
 U 1 1 5D98855F
 P 7175 1800
@@ -1131,24 +1066,7 @@ Wire Wire Line
 Wire Wire Line
 	6775 1700 6675 1700
 Wire Wire Line
-	6675 1700 6675 2100
-Wire Wire Line
-	6775 1800 6625 1800
-Wire Wire Line
-	6625 1800 6625 1500
-$Comp
-L power:+2V5 #PWR?
-U 1 1 5DA379CE
-P 6625 1500
-AR Path="/5D6A7059/5DA379CE" Ref="#PWR?"  Part="1" 
-AR Path="/5DA379CE" Ref="#PWR028"  Part="1" 
-F 0 "#PWR028" H 6625 1350 50  0001 C CNN
-F 1 "+2V5" H 6640 1673 50  0000 C CNN
-F 2 "" H 6625 1500 50  0001 C CNN
-F 3 "" H 6625 1500 50  0001 C CNN
-	1    6625 1500
-	1    0    0    -1  
-$EndComp
+	6675 1700 6675 1800
 $Comp
 L Device:C_Small C6
 U 1 1 5DA38002
@@ -1526,17 +1444,9 @@ Connection ~ 750  6175
 Wire Wire Line
 	750  6175 750  6225
 Wire Wire Line
-	5050 3750 6250 3750
-Wire Wire Line
-	5050 3850 6250 3850
-Wire Wire Line
 	7050 3750 8450 3750
 Wire Wire Line
 	7050 3850 8450 3850
-Wire Wire Line
-	6250 3950 5050 3950
-Wire Wire Line
-	5050 4050 6250 4050
 Wire Wire Line
 	7050 3950 8450 3950
 Wire Wire Line
@@ -1625,5 +1535,74 @@ F 2 "TestPoint:TestPoint_Pad_D1.5mm" H 10400 1900 50  0001 C CNN
 F 3 "~" H 10400 1900 50  0001 C CNN
 	1    10200 1900
 	0    -1   -1   0   
+$EndComp
+$Comp
+L Logic_LevelTranslator:TXS0108EPW U3
+U 1 1 5E8B3C80
+P 6650 4050
+F 0 "U3" H 6500 3375 50  0000 C CNN
+F 1 "TXS0108EPW" H 6325 3275 50  0000 C CNN
+F 2 "Package_SO:TSSOP-20_4.4x6.5mm_P0.65mm" H 6650 3300 50  0001 C CNN
+F 3 "www.ti.com/lit/ds/symlink/txs0108e.pdf" H 6650 3950 50  0001 C CNN
+	1    6650 4050
+	-1   0    0    -1  
+$EndComp
+$Comp
+L power:+3.3V #PWR0110
+U 1 1 5EA47B10
+P 9150 1450
+F 0 "#PWR0110" H 9150 1300 50  0001 C CNN
+F 1 "+3.3V" H 9165 1623 50  0000 C CNN
+F 2 "" H 9150 1450 50  0001 C CNN
+F 3 "" H 9150 1450 50  0001 C CNN
+	1    9150 1450
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:+3.3V #PWR0116
+U 1 1 5EA48108
+P 1650 3275
+F 0 "#PWR0116" H 1650 3125 50  0001 C CNN
+F 1 "+3.3V" H 1665 3448 50  0000 C CNN
+F 2 "" H 1650 3275 50  0001 C CNN
+F 3 "" H 1650 3275 50  0001 C CNN
+	1    1650 3275
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:+3.3V #PWR0117
+U 1 1 5EA48F4A
+P 6000 3000
+F 0 "#PWR0117" H 6000 2850 50  0001 C CNN
+F 1 "+3.3V" H 6015 3173 50  0000 C CNN
+F 2 "" H 6000 3000 50  0001 C CNN
+F 3 "" H 6000 3000 50  0001 C CNN
+	1    6000 3000
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	6775 1800 6675 1800
+Connection ~ 6675 1800
+Wire Wire Line
+	6675 1800 6675 2100
+Wire Wire Line
+	5050 3750 6250 3750
+Wire Wire Line
+	5050 3850 6250 3850
+Wire Wire Line
+	5050 3950 6250 3950
+Wire Wire Line
+	5050 4050 6250 4050
+$Comp
+L Connector_Generic:Conn_01x08 P3
+U 1 1 56D7164F
+P 10000 2600
+F 0 "P3" H 10000 2100 50  0000 C CNN
+F 1 "Digital" V 10100 2600 50  0000 C CNN
+F 2 "Socket_Arduino_Uno:Socket_Strip_Arduino_1x08" V 10150 2550 20  0000 C CNN
+F 3 "" H 10000 2600 50  0000 C CNN
+F 4 "???" H 10000 2600 50  0001 C CNN "LCSC Part Number"
+	1    10000 2600
+	-1   0    0    -1  
 $EndComp
 $EndSCHEMATC

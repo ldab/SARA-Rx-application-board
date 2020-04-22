@@ -6,10 +6,10 @@ $Descr A4 11693 8268
 encoding utf-8
 Sheet 2 4
 Title ""
-Date ""
-Rev ""
-Comp ""
-Comment1 ""
+Date "2020-04-22"
+Rev "0.1.0"
+Comp "More Electronics"
+Comment1 "Leonardo Bispo"
 Comment2 ""
 Comment3 ""
 Comment4 ""
@@ -587,7 +587,7 @@ F 3 "" H 10025 1775 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 Text Notes 4325 3950 0    50   ~ 0
-EN LDO = 3.67V\nOverCharge = 4.12V\nOverDisch = 3.01V\n\nLDO Output = 2.5V
+EN LDO = 3.67V\nOverCharge = 4.12V\nOverDisch = 3.60V\n\nLDO Output = 3.3V
 $Comp
 L custom:+BATT_SYS #PWR057
 U 1 1 5D9605D7
@@ -750,51 +750,11 @@ Text Label 4625 2725 2    50   ~ 0
 VBUCK
 Wire Wire Line
 	4725 2925 4675 2925
-Wire Wire Line
-	4675 2925 4675 2825
 Connection ~ 4675 2725
 Wire Wire Line
 	4675 2725 4625 2725
 Wire Wire Line
-	4725 2825 4675 2825
-Connection ~ 4675 2825
-Wire Wire Line
-	4675 2825 4675 2725
-$Comp
-L power:+2V5 #PWR053
-U 1 1 5D9D15EB
-P 3725 2700
-F 0 "#PWR053" H 3725 2550 50  0001 C CNN
-F 1 "+2V5" H 3740 2873 50  0000 C CNN
-F 2 "" H 3725 2700 50  0001 C CNN
-F 3 "" H 3725 2700 50  0001 C CNN
-	1    3725 2700
-	1    0    0    -1  
-$EndComp
-Wire Wire Line
 	8650 1750 8650 1975
-$Comp
-L power:+2V5 #PWR062
-U 1 1 5D9D5DD3
-P 8650 1750
-F 0 "#PWR062" H 8650 1600 50  0001 C CNN
-F 1 "+2V5" H 8665 1923 50  0000 C CNN
-F 2 "" H 8650 1750 50  0001 C CNN
-F 3 "" H 8650 1750 50  0001 C CNN
-	1    8650 1750
-	1    0    0    -1  
-$EndComp
-$Comp
-L custom:+2V5_NINA #PWR066
-U 1 1 5D93DA0A
-P 9550 1775
-F 0 "#PWR066" H 9550 1625 50  0001 C CNN
-F 1 "+2V5_NINA" H 9565 1948 50  0000 C CNN
-F 2 "" H 9550 1775 50  0001 C CNN
-F 3 "" H 9550 1775 50  0001 C CNN
-	1    9550 1775
-	1    0    0    -1  
-$EndComp
 $Comp
 L custom:TPS61021A U8
 U 1 1 5D956D51
@@ -1144,4 +1104,44 @@ Wire Wire Line
 	3375 6550 3375 6600
 Wire Wire Line
 	3375 6800 3375 6875
+Wire Wire Line
+	4675 2725 4675 2825
+$Comp
+L custom:+3V3_NINA #PWR0121
+U 1 1 5EA40A3E
+P 9550 1775
+F 0 "#PWR0121" H 9550 1625 50  0001 C CNN
+F 1 "+3V3_NINA" H 9565 1948 50  0000 C CNN
+F 2 "" H 9550 1775 50  0001 C CNN
+F 3 "" H 9550 1775 50  0001 C CNN
+	1    9550 1775
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:+3.3V #PWR0122
+U 1 1 5EA4B206
+P 3725 2700
+F 0 "#PWR0122" H 3725 2550 50  0001 C CNN
+F 1 "+3.3V" H 3740 2873 50  0000 C CNN
+F 2 "" H 3725 2700 50  0001 C CNN
+F 3 "" H 3725 2700 50  0001 C CNN
+	1    3725 2700
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:+3.3V #PWR0123
+U 1 1 5EA4B663
+P 8650 1750
+F 0 "#PWR0123" H 8650 1600 50  0001 C CNN
+F 1 "+3.3V" H 8665 1923 50  0000 C CNN
+F 2 "" H 8650 1750 50  0001 C CNN
+F 3 "" H 8650 1750 50  0001 C CNN
+	1    8650 1750
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	4725 2825 4675 2825
+Connection ~ 4675 2825
+Wire Wire Line
+	4675 2825 4675 2925
 $EndSCHEMATC

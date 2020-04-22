@@ -6,10 +6,10 @@ $Descr A4 11693 8268
 encoding utf-8
 Sheet 4 4
 Title ""
-Date ""
-Rev ""
-Comp ""
-Comment1 ""
+Date "2020-04-22"
+Rev "0.1.0"
+Comp "More Electronics"
+Comment1 "Leonardo Bispo"
 Comment2 ""
 Comment3 ""
 Comment4 ""
@@ -411,9 +411,6 @@ PWR_ON -> LOW turns module ON and OFF\nA1/P0.30 -> Active High
 Text Notes 4950 4825 0    50   ~ 0
 Configure A2/P0.05 as Input Pull-up
 NoConn ~ 4950 3975
-Wire Wire Line
-	1800 1175 1800 1425
-Connection ~ 1800 1425
 $Comp
 L custom:+BATT_SYS #PWR0119
 U 1 1 5D9DBA3A
@@ -470,39 +467,6 @@ F 1 "GND" H 9705 4027 50  0001 C CNN
 F 2 "" H 9700 4200 50  0001 C CNN
 F 3 "" H 9700 4200 50  0001 C CNN
 	1    9700 4200
-	1    0    0    -1  
-$EndComp
-$Comp
-L custom:+2V5_NINA #PWR0110
-U 1 1 5D9F7170
-P 1800 1175
-F 0 "#PWR0110" H 1800 1025 50  0001 C CNN
-F 1 "+2V5_NINA" H 1815 1348 50  0000 C CNN
-F 2 "" H 1800 1175 50  0001 C CNN
-F 3 "" H 1800 1175 50  0001 C CNN
-	1    1800 1175
-	1    0    0    -1  
-$EndComp
-$Comp
-L custom:+2V5_NINA #PWR0117
-U 1 1 5D9F78DE
-P 9700 3350
-F 0 "#PWR0117" H 9700 3200 50  0001 C CNN
-F 1 "+2V5_NINA" H 9715 3523 50  0000 C CNN
-F 2 "" H 9700 3350 50  0001 C CNN
-F 3 "" H 9700 3350 50  0001 C CNN
-	1    9700 3350
-	1    0    0    -1  
-$EndComp
-$Comp
-L custom:+2V5_NINA #PWR0116
-U 1 1 5D9FA6C1
-P 9300 1375
-F 0 "#PWR0116" H 9300 1225 50  0001 C CNN
-F 1 "+2V5_NINA" H 9315 1548 50  0000 C CNN
-F 2 "" H 9300 1375 50  0001 C CNN
-F 3 "" H 9300 1375 50  0001 C CNN
-	1    9300 1375
 	1    0    0    -1  
 $EndComp
 Wire Notes Line
@@ -610,4 +574,40 @@ Wire Wire Line
 Connection ~ 9125 3375
 Wire Wire Line
 	9125 3375 9700 3375
+$Comp
+L custom:+3V3_NINA #PWR0124
+U 1 1 5EA3C3EE
+P 9700 3350
+F 0 "#PWR0124" H 9700 3200 50  0001 C CNN
+F 1 "+3V3_NINA" H 9715 3523 50  0000 C CNN
+F 2 "" H 9700 3350 50  0001 C CNN
+F 3 "" H 9700 3350 50  0001 C CNN
+	1    9700 3350
+	1    0    0    -1  
+$EndComp
+Connection ~ 1800 1425
+$Comp
+L custom:+3V3_NINA #PWR0125
+U 1 1 5EA42D1D
+P 1800 1150
+F 0 "#PWR0125" H 1800 1000 50  0001 C CNN
+F 1 "+3V3_NINA" H 1815 1323 50  0000 C CNN
+F 2 "" H 1800 1150 50  0001 C CNN
+F 3 "" H 1800 1150 50  0001 C CNN
+	1    1800 1150
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	1800 1150 1800 1425
+$Comp
+L custom:+3V3_NINA #PWR0126
+U 1 1 5EA46E3E
+P 9300 1375
+F 0 "#PWR0126" H 9300 1225 50  0001 C CNN
+F 1 "+3V3_NINA" H 9315 1548 50  0000 C CNN
+F 2 "" H 9300 1375 50  0001 C CNN
+F 3 "" H 9300 1375 50  0001 C CNN
+	1    9300 1375
+	1    0    0    -1  
+$EndComp
 $EndSCHEMATC
