@@ -53,11 +53,23 @@ typedef struct {
     uint8_t   content[513];
 } socket_t;
 
+typedef struct {
+    bool    attach;
+    float   RSRP;
+    float   RSRQ;
+} modemInfo_t;
+
 socket_t socket = {
   .connected    = false,
   .identifier   = 99,
   .length       =  0,
   .content      = "",
+};
+
+modemInfo_t modemInfo = {
+              .attach = false,
+              .RSRP   = -32760,
+              .RSRQ   = -32760,
 };
 
 typedef const char* ModemConstStr;
@@ -708,6 +720,28 @@ bool iotublox_powerSave(bool upsv, bool psm, const char* tau, const char* active
 }
 
 /**
+* @brief Channel and network environment description +UCGED.
+* */
+void rsrp_rsrq(void)
+{
+  sendAT("+UCGED?");
+
+  waitResponse(MODEM_TIMEOUT, "+RSRP: ");
+  
+  char* _resp  = readStringUntil('O');    // read until OK
+  _resp = strtok(_resp, "\"");
+  
+  modemInfo.RSRP  = atof(strtok(NULL, "\""));
+
+  _resp = strtok(NULL, "+");
+  _resp = strtok(NULL, "\"");
+  
+  modemInfo.RSRQ  = atof(strtok(NULL, "\""));
+
+  uart_clear();
+}
+
+/**
 * @brief Set APN and Activate PDP context
 *
 * @param APN.
@@ -717,6 +751,9 @@ bool iotublox_powerSave(bool upsv, bool psm, const char* tau, const char* active
 bool iotublox_connect(const char* apn)
 {
   char _command[AT_BUFFER] = "";
+
+  sendAT("+UCGED=5");                                    //  RSRP and RSRQ reporting enabled
+  if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
 
   sprintf(_command, "+CGDCONT=1,\"IP\",\"%s\"", apn);    // Define PDP context 1
   sendAT(_command);  
@@ -741,9 +778,13 @@ bool iotublox_connect(const char* apn)
 
   sendAT("+CGATT=1");                                   // GPRS Attach 
   if (waitResponse(150000L, R_OK) != 1) return false;
+  else
+    modemInfo.attach = true;
 
   sendAT("+CGCONTRDP=1");
   waitResponse(150000L, R_OK);
+
+  rsrp_rsrq();
 
   return true;
 }

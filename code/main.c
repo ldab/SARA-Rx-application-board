@@ -19,7 +19,10 @@
 #include "app_timer.h"
 #include "nrf_drv_clock.h"
 #include "nrf_delay.h"
-#include "nrf_drv_power.h"
+
+#include "nrf_soc.h"
+#include "nrf_pwr_mgmt.h"
+#include "nordic_common.h"
 
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
@@ -28,21 +31,34 @@
 #include "iotublox.h"
 #include "mqtt.h"
 #include "shtc3.h"
+#include "nrf_drv_saadc.h"
 
-//#define MQTT_HOST     "m24.cloudmqtt.com"
-//#define MQTT_PORT     17603
-//#define MQTT_PORT_SSL 27603
-//#define MQTT_ID       "n928y23dj09u20"
-//#define MQTT_USER     "qvpgdxqg"
-//#define MQTT_PASS     "YVTESIVDgHlN"
-
-#define MQTT_HOST     "a2jzp6o827zjxz-ats.iot.us-east-2.amazonaws.com"
+#define MQTT_HOST     "m24.cloudmqtt.com"
 #define MQTT_PORT     17603
-#define MQTT_PORT_SSL 8883
-#define HTTP_PORT_SSL 8443
+#define MQTT_PORT_SSL 27603
 #define MQTT_ID       "n928y23dj09u20"
-#define MQTT_USER     ""
-#define MQTT_PASS     ""
+#define MQTT_USER     "qvpgdxqg"
+#define MQTT_PASS     "YVTESIVDgHlN"
+
+//#define MQTT_HOST     "a2jzp6o827zjxz-ats.iot.us-east-2.amazonaws.com"
+//#define MQTT_PORT     17603
+//#define MQTT_PORT_SSL 8883
+//#define HTTP_PORT_SSL 8443
+//#define MQTT_ID       "n928y23dj09u20"
+//#define MQTT_USER     ""
+//#define MQTT_PASS     ""
+
+#define ADC_REF_VOLTAGE_IN_MILLIVOLTS   600                                     /**< Reference voltage (in milli volts) used by ADC while doing conversion. */
+#define ADC_PRE_SCALING_COMPENSATION    6                                       /**< The ADC is configured to use VDD with 1/3 prescaling as input. And hence the result of conversion is to be multiplied by 3 to get the actual value of the battery voltage.*/
+#define DIODE_FWD_VOLT_DROP_MILLIVOLTS  128                                      // NOTE changed to match measurement
+#define ADC_RES_8BIT                    256                                     /**< Maximum digital value for 10-bit ADC conversion. */
+#define ADC_RES_10BIT                   1024                                    /**< Maximum digital value for 10-bit ADC conversion. */
+#define ADC_RES_14BIT                   16384                                   /**< Maximum digital value for 14-bit ADC conversion. */                                
+
+#define ADC_RESULT_IN_MILLI_VOLTS(ADC_VALUE)\
+        ((((ADC_VALUE) * ADC_REF_VOLTAGE_IN_MILLIVOLTS) / ADC_RES_14BIT) * ADC_PRE_SCALING_COMPENSATION * 2)  // NOTE check resolution at sdk_config.h
+
+static nrf_saadc_value_t adc_buf;
 
 static void sleep_handler(void)
 {
@@ -59,24 +75,80 @@ void URC_handler(void)
   uart_clear();
 }
 
+/**@brief Function for configuring ADC to do battery level conversion.
+ */
+void saadc_event_handler(nrf_drv_saadc_evt_t const * p_event)
+{
+    if (p_event->type == NRF_DRV_SAADC_EVT_DONE)
+    {
+      // no implementation needed
+    }
+}
+
+/**@brief Function for handling bsp events.
+ */
+void bsp_evt_handler(bsp_event_t evt)
+{
+    uint32_t err_code;
+    switch (evt)
+    {
+        case BSP_EVENT_KEY_0:
+
+            break;
+
+        default:
+            return; // no implementation needed
+    }
+    err_code = bsp_indication_set(BSP_INDICATE_SENT_OK);
+    APP_ERROR_CHECK(err_code);
+}
+
+/**@brief Function for configuring ADC to do battery level conversion.
+ */
+static void adc_configure(void)
+{
+    ret_code_t err_code = nrf_drv_saadc_init(NULL, saadc_event_handler);
+    APP_ERROR_CHECK(err_code);
+
+    nrf_saadc_channel_config_t config =
+        NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(SAADC_CH_PSELP_PSELP_AnalogInput2);    // P0.04 = AnalogIn 2 -> https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.nrf52832.ps.v1.1%2Fpin.html
+    err_code = nrf_drv_saadc_channel_init(0, &config);
+    APP_ERROR_CHECK(err_code);
+}
+
+/**@brief Function for turning modem Off.
+ */
+bool sara_pwr_off(void)
+{
+  nrf_gpio_pin_write(ARDUINO_A1_PIN, 1);
+  nrf_delay_ms(1500);
+  nrf_gpio_pin_write(ARDUINO_A1_PIN, 0);
+
+  while(nrf_gpio_pin_read(ARDUINO_A2_PIN));
+
+  NRF_LOG_INFO("Turning SARA off");
+
+  return true;
+}
+
 /**
  * @brief Function for main application entry.
  */
 int main(void)
 {
-    ret_code_t err_code = NRF_LOG_INIT(app_timer_cnt_get);
+    ret_code_t err_code = NRF_LOG_INIT(app_timer_cnt_get);    // Start RTT with timestamps
     APP_ERROR_CHECK(err_code);
 
     NRF_LOG_DEFAULT_BACKENDS_INIT();
 
-    bsp_board_init(BSP_INIT_LEDS);
+    err_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, bsp_evt_handler);
 
-    nrf_gpio_cfg_input(ARDUINO_6_PIN, NRF_GPIO_PIN_PULLUP);   // SW3, user button
-    nrf_gpio_cfg_input(BUTTON_1, NRF_GPIO_PIN_PULLUP);  // V_INT input
-    //nrf_gpio_cfg_input(BUTTON_2, NRF_GPIO_PIN_PULLUP);        // EVK button
-    //nrf_gpio_cfg_input(BUTTON_1, NRF_GPIO_PIN_PULLUP);        // EVK button
+    APP_ERROR_CHECK(err_code);
+
+    nrf_gpio_cfg_input(ARDUINO_A2_PIN, NRF_GPIO_PIN_PULLUP);  // V_INT input
     nrf_gpio_cfg_output(ARDUINO_A1_PIN);                      // PWR_ON Pin, active High
-    
+    nrf_gpio_cfg_output(RTS_PIN_NUMBER);
+
     // Function starting the internal low-frequency clock LFCLK XTAL oscillator.
     // (When SoftDevice is enabled the LFCLK is always running and this is not needed).
     ret_code_t ret = nrf_drv_clock_init();
@@ -86,38 +158,48 @@ int main(void)
     ret = app_timer_init();
     APP_ERROR_CHECK(ret);
 
-    uart_init();
-
-    static uint8_t welcome[] = "App started\r\n";
-
-    NRF_LOG_INFO("%s", welcome);
-    NRF_LOG_FLUSH();
+    bsp_indication_set(BSP_INDICATE_ADVERTISING_SLOW);
 
     while( nrf_gpio_pin_read(BUTTON_1) )
     {
-      NRF_LOG_INFO("Press the button, it is = %d", nrf_gpio_pin_read(BUTTON_1));NRF_LOG_FLUSH();
-      bsp_board_led_invert(0);
-      nrf_delay_ms(200);
-      bsp_board_led_invert(1);
-      nrf_delay_ms(200);
+      __WFE();
     }
+
+    bsp_indication_set(BSP_INDICATE_ADVERTISING);
+
+    adc_configure();
 
           twi_init();
           float    temperature; // temperature
           float    humidity;    // relative humidity
-          SHTC3_getID();
           SHTC3_GetTempAndHumiPolling(&temperature, &humidity);
           NRF_LOG_INFO("Temp: " NRF_LOG_FLOAT_MARKER "°C and Hum: " NRF_LOG_FLOAT_MARKER "%%", NRF_LOG_FLOAT(temperature), NRF_LOG_FLOAT(humidity)); NRF_LOG_FLUSH();
-          nrf_delay_ms(2000);
-          NRF_LOG_INFO("Good night"); NRF_LOG_FLUSH();
           SHTC3_Sleep();
 
-    bsp_board_leds_off();
+          nrf_saadc_value_t adc_result;
+          err_code = nrf_drv_saadc_sample_convert(0, &adc_result);
+          APP_ERROR_CHECK(err_code);
 
-    iotublox_init(100, "8", 524420, 524420);
+          uint16_t batt_lvl_in_milli_volts = ADC_RESULT_IN_MILLI_VOLTS(adc_result) +
+                                             DIODE_FWD_VOLT_DROP_MILLIVOLTS;
+          uint8_t percentage_batt_lvl = battery_level_in_percent((uint16_t)(batt_lvl_in_milli_volts * 3000/4200));
+
+    NRF_LOG_INFO("ADC: %d, Milli %d, Perc %d", adc_result, batt_lvl_in_milli_volts, percentage_batt_lvl); NRF_LOG_FLUSH();
+
+    uart_init();
+
+    // Turn SARA ON
+    nrf_gpio_pin_write(ARDUINO_A1_PIN, 1);
+    nrf_delay_ms(500);
+    nrf_gpio_pin_write(ARDUINO_A1_PIN, 0);
+    nrf_delay_ms(4500);
+
+    // INIT Modem
+    iotublox_init(100, "7", 524420, 524420);
     iotublox_powerSave(false, false, NULL, NULL);
-    iotublox_connect("company.iot.dk1.tdc");
-    //iotublox_connect("lpwa.telia.iot");
+    iotublox_connect("lpwa.telia.iot");
+
+    bsp_indication_set(BSP_INDICATE_ADVERTISING_SLOW);
 
     while (true)
     {
@@ -128,6 +210,7 @@ int main(void)
         uart_clear();
 
         /***************************** POST Secure Example using AT Commands API*****************************************/
+        #ifdef HTTP_PORT_SSL
           do{
             iot_connSocketSSL(MQTT_HOST, HTTP_PORT_SSL, AWS_CERTS[0], AWS_CERTS[1], AWS_CERTS[2]);
             }while(socket.connected == false);
@@ -144,47 +227,67 @@ int main(void)
           NRF_LOG_FLUSH();
 
           iot_closeSocket(socket.identifier);
+        #endif
           /***********************************************************************************************************/
 
           /*****************************MQTT Non-Secure using AT Commands API*****************************************/
+          bsp_indication_set(BSP_INDICATE_ADVERTISING_WHITELIST);
+
+          char _msg[64];
+          sprintf(_msg, "T:%.01f, H:%.01f, B:%d, RSRP:%.02f Non Sec API", temperature, humidity, percentage_batt_lvl, modemInfo.RSRP);
           iotublox_mqtt_config(MQTT_HOST, MQTT_PORT, MQTT_ID, MQTT_USER, MQTT_PASS);
-          iotublox_mqtt_publish("nina/test", "{\"units\": \"MW\", \"value\": 3229, \"ts\": \"05/09/2018 00:05:00\"}", 0);
+          iotublox_mqtt_publish("nina/test", _msg, 0);
           iotublox_mqtt_disconnect();
 
-          nrf_delay_ms(1000);
+          //nrf_delay_ms(1000);
           /***********************************************************************************************************/
 
           /*****************************MQTT Non-Secure Socket implementation*****************************************/
+          bsp_indication_set(BSP_INDICATE_ADVERTISING_DIRECTED);
+
           do{
             iot_connSocket(MQTT_HOST, MQTT_PORT);
             }while(socket.connected == false);
 
+          memset(_msg, '\0', sizeof(_msg));
+          sprintf(_msg, "T:%.01f, H:%.01f Non Sec Socket", temperature, humidity);
+
           mqtt_connect(MQTT_ID, MQTT_USER, MQTT_PASS, 0, 0, 0, 0, 1);
-          mqtt_publish("nina/test", "Merry Christmas!", false);
+          mqtt_publish("nina/test", _msg, false);
           /***********************************************************************************************************/
 
-          NRF_LOG_INFO("Finish Button 2");
-          NRF_LOG_FLUSH();
-
-          nrf_delay_ms(1000);
-
-        }
+          //nrf_delay_ms(1000);
 
         /*****************************MQTT Secure Socket implementation*****************************************/
-        if( !nrf_gpio_pin_read(BUTTON_1) )
-        {
+          bsp_indication_set(BSP_INDICATE_BONDING);
+
           do{
-            //iot_connSocketSSL(MQTT_HOST, MQTT_PORT_SSL, CloudMQTT_CERTS[0], CloudMQTT_CERTS[1], CloudMQTT_CERTS[2]);
-            iot_connSocketSSL(MQTT_HOST, MQTT_PORT_SSL, AWS_CERTS[0], AWS_CERTS[1], AWS_CERTS[2]);
+            iot_connSocketSSL(MQTT_HOST, MQTT_PORT_SSL, CloudMQTT_CERTS[0], CloudMQTT_CERTS[1], CloudMQTT_CERTS[2]);
+            //iot_connSocketSSL(MQTT_HOST, MQTT_PORT_SSL, AWS_CERTS[0], AWS_CERTS[1], AWS_CERTS[2]);
             }while(socket.connected == false);
 
+          memset(_msg, '\0', sizeof(_msg));
+          sprintf(_msg, "T:%.01f, H:%.01f Sec Socket", temperature, humidity);
+
           mqtt_connect(MQTT_ID, MQTT_USER, MQTT_PASS, 0, 0, 0, 0, true);
-          mqtt_publish("nina/test", "This is secure", false);
+          mqtt_publish("nina/test", _msg, false);
        /***********************************************************************************************************/
 
-          nrf_delay_ms(1000);
-        }
+          bsp_indication_set(BSP_INDICATE_USER_STATE_1);
 
+          sara_pwr_off();
+
+          nrf_libuarte_async_uninit(&modem_uart);
+
+          nrf_gpio_cfg_default(TX_PIN_NUMBER);
+          nrf_gpio_cfg_default(RX_PIN_NUMBER);
+          bsp_indication_set(BSP_INDICATE_IDLE);
+
+          nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_GOTO_SYSOFF);
+        }
+        
         NRF_LOG_FLUSH();
+        __WFE();
     }
+
 }

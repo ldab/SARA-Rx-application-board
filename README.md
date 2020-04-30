@@ -78,13 +78,14 @@ Ref. https://devzone.nordicsemi.com/f/nordic-q-a/44638/how-to-move-an-sdk-exampl
 
 * MQTT Socket Implementaition can only **publish** QoS 0 messages.
 
-## Final Thoughts or Improvements
+## Thoughts or Improvements
 
 * Use STATUS 2 of AEM10941 as last grasp;
 * Control boost converter EN, in order to turn SARA Off;
+  * Remove boost converter, as it does not boost a lot since Vbatt ON = 3.6V.
 * SARA RESET Pin access;
 * Use 101b AEM10941 Configuration in order to Vovdis = 3.0V givin extra ~20% battery (?).
-* Open Drain 74LVC3G07 buffer on NINA RGB, in order to avoid leakage.
+* Open Drain 74LVC3G07 buffer on NINA LED, in order to avoid leakage.
 
 ## Credits
 
