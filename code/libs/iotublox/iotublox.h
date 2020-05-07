@@ -21,6 +21,7 @@ extern "C" {
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 #include "nrf_delay.h"
 #include "nrf_log.h"
@@ -536,10 +537,7 @@ uint32_t millis(void)
 
   uint64_t ticks = (uint64_t)((uint64_t)overflows << (uint64_t)24) | (uint64_t)(NRF_RTC1->COUNTER);
 
-  return (ticks * 1000) / 16384;
-
-  //return app_timer_cnt_get() / 32.768;
-  //return (uint32_t)app_timer_cnt_get() / 16.384;
+  return (ticks * 1000) / (32768 / (APP_TIMER_CONFIG_RTC_FREQUENCY + 1));
 }
 
 /**

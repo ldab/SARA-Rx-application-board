@@ -37,7 +37,7 @@ typedef struct {
     uint32_t length;
 } buffer_t;
 
-NRF_LIBUARTE_ASYNC_DEFINE(modem_uart, 0, 0, 0, NRF_LIBUARTE_PERIPHERAL_NOT_USED, 255, 3);
+NRF_LIBUARTE_ASYNC_DEFINE(modem_uart, 0, 0, NRF_LIBUARTE_PERIPHERAL_NOT_USED, NRF_LIBUARTE_PERIPHERAL_NOT_USED, 255, 3);
 
 NRF_QUEUE_DEF(buffer_t, m_buf_queue, 10, NRF_QUEUE_MODE_NO_OVERFLOW);     // Queue is used for the TX queue
 
@@ -72,7 +72,7 @@ ret_code_t uart_init(void)
     .parity     = NRF_UARTE_PARITY_EXCLUDED,
     .hwfc       = NRF_UARTE_HWFC_DISABLED,
     .timeout_us = 100,
-    .int_prio   = APP_IRQ_PRIORITY_LOW
+    .int_prio   = APP_IRQ_PRIORITY_LOW_MID
   };
 
   ret_code_t err_code = nrf_libuarte_async_init(&modem_uart, &nrf_libuarte_async_config, uart_event_handler, (void *)&modem_uart);
