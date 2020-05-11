@@ -37,7 +37,7 @@ typedef struct {
     uint32_t length;
 } buffer_t;
 
-NRF_LIBUARTE_ASYNC_DEFINE(modem_uart, 0, 0, 0, NRF_LIBUARTE_PERIPHERAL_NOT_USED, 255, 3);
+NRF_LIBUARTE_ASYNC_DEFINE(modem_uart, 0, 0, NRF_LIBUARTE_PERIPHERAL_NOT_USED, NRF_LIBUARTE_PERIPHERAL_NOT_USED, 255, 3);
 
 NRF_QUEUE_DEF(buffer_t, m_buf_queue, 10, NRF_QUEUE_MODE_NO_OVERFLOW);     // Queue is used for the TX queue
 
@@ -52,8 +52,8 @@ void uart_event_handler(void * context, nrf_libuarte_async_evt_t * p_evt)
             bsp_board_led_on(0);
             break;
         case NRF_LIBUARTE_ASYNC_EVT_RX_DATA:
-//            strncat(_buff, p_evt->data.rxtx.p_data, p_evt->data.rxtx.length);
-            strcat(_buff, p_evt->data.rxtx.p_data);
+            strncat(_buff, p_evt->data.rxtx.p_data, p_evt->data.rxtx.length);
+            //strcat(_buff, p_evt->data.rxtx.p_data);
             nrf_libuarte_async_rx_free(p_libuarte, p_evt->data.rxtx.p_data, p_evt->data.rxtx.length);
             break;
         case NRF_LIBUARTE_ASYNC_EVT_TX_DONE:
@@ -72,7 +72,7 @@ ret_code_t uart_init(void)
     .parity     = NRF_UARTE_PARITY_EXCLUDED,
     .hwfc       = NRF_UARTE_HWFC_DISABLED,
     .timeout_us = 100,
-    .int_prio   = APP_IRQ_PRIORITY_LOW
+    .int_prio   = APP_IRQ_PRIORITY_LOW_MID
   };
 
   ret_code_t err_code = nrf_libuarte_async_init(&modem_uart, &nrf_libuarte_async_config, uart_event_handler, (void *)&modem_uart);
@@ -124,6 +124,36 @@ void uart_write(char *data)
 {
   ret_code_t ret;
   size_t size = strlen(data);
+  
+  while(ret != NRF_SUCCESS) ret = nrf_libuarte_async_tx(&modem_uart, data, size);
+
+  if (ret == NRF_ERROR_BUSY)
+  {
+      buffer_t buf = {
+          .p_data = data,
+          .length = size,
+      };
+
+      ret = nrf_queue_push(&m_buf_queue, &buf);
+      APP_ERROR_CHECK(ret);
+  }
+  else
+  {
+      APP_ERROR_CHECK(ret);
+  }
+  while (!nrf_queue_is_empty(&m_buf_queue))
+  {    
+      bsp_board_led_invert(1);
+      buffer_t _b;
+      ret = nrf_queue_pop(&m_buf_queue, &_b);
+      APP_ERROR_CHECK(ret);
+      UNUSED_RETURN_VALUE(nrf_libuarte_async_tx(&modem_uart, _b.p_data, _b.length));
+  }
+}
+
+void uart_write_bin(char *data, size_t size)
+{
+  ret_code_t ret = -1;
   
   while(ret != NRF_SUCCESS) ret = nrf_libuarte_async_tx(&modem_uart, data, size);
 

@@ -16,6 +16,7 @@ code/pca10056/blank/ses/libuarte_pca10056.emSession
 *.bak
 *.bck
 *.kicad_pcb-bak
+*.kicad_pcb
 *.sch-bak
 *~
 _autosave-*
@@ -36,3 +37,5 @@ fp-info-cache
 *.ses
 
 PCB/fp-lib-table
+PCB/sara-rx-ab-rescue.dcm
+PCB/sym-lib-table
