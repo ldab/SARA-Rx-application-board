@@ -109,6 +109,8 @@ void bsp_evt_handler(bsp_event_t evt)
     switch (evt)
     {
         case BSP_EVENT_KEY_0:
+            err_code = app_timer_stop(m_wake_timer_id);
+            APP_ERROR_CHECK(err_code);
             wake_evt = true;
             break;
 
@@ -149,11 +151,47 @@ bool sara_pwr_off(void)
 {
   NRF_LOG_INFO("Turning SARA off");
 
-  nrf_gpio_pin_write(ARDUINO_A1_PIN, 1);
-  nrf_delay_ms(1500);                   //TODO remove delay and attach interrupt to ARDUIONO A1 PIN
-  nrf_gpio_pin_write(ARDUINO_A1_PIN, 0);
+  if( nrf_gpio_pin_read(ARDUINO_A2_PIN) == 0 )
+  {
+    nrf_gpio_pin_write(ARDUINO_A1_PIN, 1);
+    nrf_delay_ms(1500);                   //TODO remove delay and attach interrupt to ARDUIONO A1 PIN
+    nrf_gpio_pin_write(ARDUINO_A1_PIN, 0);
+  }
+  else
+  {
+    // already off
+  }
 
   return true;
+}
+
+/**@brief Function for putting NINA to sleep.
+ */
+bool nina_sleep(uint32_t sleep_time)
+{
+  bsp_indication_set(BSP_INDICATE_USER_STATE_1);
+
+  sara_pwr_off();
+
+  nrf_libuarte_async_uninit(&modem_uart);
+
+  // work around for UARTE uninit does not end DMA: https://devzone.nordicsemi.com/f/nordic-q-a/54271/nrf52840-fails-to-go-to-low-power-mode-when-using-uart-rx-double-buffering
+  *(volatile uint32_t *)0x40002FFC = 0;
+  *(volatile uint32_t *)0x40002FFC;
+  *(volatile uint32_t *)0x40002FFC = 1;
+
+  nrf_gpio_cfg_default(TX_PIN_NUMBER);
+  nrf_gpio_cfg_default(RX_PIN_NUMBER);
+
+  bsp_indication_set(BSP_INDICATE_IDLE);
+
+  ret_code_t err_code = app_timer_create(&m_wake_timer_id, APP_TIMER_MODE_SINGLE_SHOT, wake_on_RTC);
+  APP_ERROR_CHECK(err_code);
+
+  err_code = app_timer_start(m_wake_timer_id, APP_TIMER_TICKS(sleep_time), NULL);
+  APP_ERROR_CHECK(err_code);
+
+  wake_evt = false;
 }
 
 void read_sensor_adc(float *temp, float *humi, uint16_t *batt_v, uint8_t *batt_pc)
@@ -177,7 +215,7 @@ void read_sensor_adc(float *temp, float *humi, uint16_t *batt_v, uint8_t *batt_p
   *batt_v  = ADC_RESULT_IN_MILLI_VOLTS(adc_result) + DIODE_FWD_VOLT_DROP_MILLIVOLTS;
   *batt_pc = battery_level_in_percent((uint16_t)(*batt_v * 3000 / 4200));
 
-  NRF_LOG_INFO("Temp: " NRF_LOG_FLOAT_MARKER "°C and Hum: " NRF_LOG_FLOAT_MARKER "%%", NRF_LOG_FLOAT(_t), NRF_LOG_FLOAT(_h)); NRF_LOG_FLUSH();
+  NRF_LOG_INFO("Temp: " NRF_LOG_FLOAT_MARKER "ï¿½C and Hum: " NRF_LOG_FLOAT_MARKER "%%", NRF_LOG_FLOAT(_t), NRF_LOG_FLOAT(_h)); NRF_LOG_FLUSH();
   NRF_LOG_INFO("ADC: %d, Milli %d, Perc %d", adc_result, *batt_v, *batt_pc); NRF_LOG_FLUSH();
 }
 
@@ -239,7 +277,8 @@ int main(void)
         // INIT Modem
         iotublox_init(100, "7", 524420, 524420);
         iotublox_powerSave(false, false, NULL, NULL);
-        iotublox_connect("lpwa.telia.iot");
+        if( iotublox_connect("lpwa.telia.iot") == false )
+          goto FINISH;
         
         iot_closeSocket( 0 );
         uart_clear();
@@ -315,29 +354,7 @@ int main(void)
           */
        /***********************************************************************************************************/
 
-          bsp_indication_set(BSP_INDICATE_USER_STATE_1);
-
-          sara_pwr_off();
-
-          nrf_libuarte_async_uninit(&modem_uart);
-
-          // work around for UARTE uninit does not end DMA: https://devzone.nordicsemi.com/f/nordic-q-a/54271/nrf52840-fails-to-go-to-low-power-mode-when-using-uart-rx-double-buffering
-          *(volatile uint32_t *)0x40002FFC = 0;
-          *(volatile uint32_t *)0x40002FFC;
-          *(volatile uint32_t *)0x40002FFC = 1;
-
-          nrf_gpio_cfg_default(TX_PIN_NUMBER);
-          nrf_gpio_cfg_default(RX_PIN_NUMBER);
-
-          bsp_indication_set(BSP_INDICATE_IDLE);
-
-          err_code = app_timer_create(&m_wake_timer_id, APP_TIMER_MODE_SINGLE_SHOT, wake_on_RTC);
-          APP_ERROR_CHECK(err_code);
-
-          err_code = app_timer_start(m_wake_timer_id, APP_TIMER_TICKS(SLEEP_COUNTERTIME_MS), NULL);
-          APP_ERROR_CHECK(err_code);
-          
-          wake_evt = false;
+          FINISH: nina_sleep( SLEEP_COUNTERTIME_MS );
 
           NRF_LOG_FLUSH();
         }

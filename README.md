@@ -18,8 +18,8 @@
 
 ## Energy Budget
 
-* 120mA active current;
-* Code takes 15 seconds to execute;
+* 100mA active current;
+* Code takes ~10 seconds to execute;
 * Wakes every hour;
 * 2mA Sleep current *This needs to be optimized*;
 * 10 hours of light available;
@@ -29,6 +29,21 @@
 
 **Source Power Required = 34mW**
 **Storage Required = 42.28mAh**
+
+![](./power_profile/exec_time.png)
+
+### Sleep Current
+
+| Component 	| Current 	|
+|-----------	|---------	|
+| SARA-R410 	| 7uA     	|
+| NINA-B3   	| 3uA     	|
+| Batt ADC  	| 3uA     	|
+| SHTC3     	| 0.5uA   	|
+| TP4054    	| 1uA     	|
+| TXS0108   	| 5uA(?)  	|
+| ????      	| ~20uA   	|
+| TOTAL     	| ~40uA   	|
 
 ## Nordic SDK
 
