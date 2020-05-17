@@ -21,14 +21,14 @@
 * 100mA active current;
 * Code takes ~10 seconds to execute;
 * Wakes every hour;
-* 2mA Sleep current *This needs to be optimized*;
+* 40uA Sleep current;
 * 10 hours of light available;
 * V charge ready = 3.67V;
 * V Over discharge = 3.6V;
 * V Over charge = 4.12V;
 
-**Source Power Required = 34mW**
-**Storage Required = 42.28mAh**
+**Source Power Required = 4.4mW**
+**Storage Required = 5.4mAh**
 
 ![](./power_profile/exec_time.png)
 
