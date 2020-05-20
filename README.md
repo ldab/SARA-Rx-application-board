@@ -42,8 +42,8 @@
 | SHTC3     	| 0.5uA   	|
 | TP4054    	| 1uA     	|
 | TXS0108   	| 5uA(?)  	|
-| ????      	| ~20uA   	|
-| TOTAL     	| ~40uA   	|
+| TPS61021A  	| 17uA   	  |
+| TOTAL     	| ~37uA   	|
 
 ## Nordic SDK
 
@@ -68,6 +68,27 @@ https://docs.aws.amazon.com/iot/latest/developerguide/iot-gs.html
 * PS. don't forget to set the NFC Pins as GPIO on the Preprocessor: `CONFIG_NFCT_PINS_AS_GPIOS`
 
 Ref. https://devzone.nordicsemi.com/f/nordic-q-a/44638/how-to-move-an-sdk-example-out-of-the-sdk-tree
+
+## IoT Dashboard
+
+* Adafruit https://io.adafruit.com provides a free MQTT broker with a Dashboard allowing this project to be displayed publicly with little to no effort
+  * Create an account and insert your KEY as the `MQTT_PASS`
+  * `MQTT_USER` is the username used for creating the account.
+
+* Adafruit expect data as a json, for example:
+
+    ```
+    sprintf(_msg, "{\"feeds\": {\"T\": %.01f,\"H\": %.01f,\"Bpc\": %d,\"RSRP\": %.02f,\"Bv\": %.02f}}",
+            temperature, humidity, batt_lvl_in_percentage, modemInfo.RSRP, _b)
+    ```
+
+* The topic, groups and feeds are created automagically, on the example the MAC address is added as an identifier:
+
+    ```
+    sprintf(topic, "lbispo/g/nina_%X/json", NRF_FICR->DEVICEADDR[0]);
+    ```
+
+<img src="./pics/dashboard.png" width="50%"> 
 
 ## Efficiency
 
