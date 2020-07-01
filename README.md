@@ -7,6 +7,8 @@
 
 [![GitHub last commit](https://img.shields.io/github/last-commit/ldab/SARA-Rx-application-board.svg?style=social)](https://github.com/ldab/SARA-Rx-application-board)
 
+# **:heavy_exclamation_mark:BEFORE YOU DO ANYTHING, CHECK BATTERY POLARITY:heavy_exclamation_mark:**
+
 ## TODO
 
 - [ ] More details about battery etc...
