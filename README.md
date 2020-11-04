@@ -35,6 +35,8 @@
 
 ![](./power_profile/exec_time.png)
 
+![](./power_profile/power.png)
+
 ### Sleep Current
 
 | Component 	| Current 	|
