@@ -20,7 +20,7 @@
 
 ## Energy Budget
 
-* 100mA active current;
+* 88mA active current;
 * Code takes ~10 seconds to execute;
 * Wakes every hour;
 * 40uA Sleep current;
@@ -29,8 +29,9 @@
 * V Over discharge = 3.6V;
 * V Over charge = 4.12V;
 
-**Source Power Required = 4.4mW**
-**Storage Required = 5.4mAh**
+**Source Power Required = 3.8mW**
+
+**Storage Required = 4.73mAh**
 
 ![](./power_profile/exec_time.png)
 
@@ -92,13 +93,15 @@ Ref. https://devzone.nordicsemi.com/f/nordic-q-a/44638/how-to-move-an-sdk-exampl
 
 <img src="./pics/dashboard.png" width="50%"> 
 
+https://io.adafruit.com/lbispo/dashboards/moree?kiosk=true
+
 ## Efficiency
 
 <img src="./pics/effchart.png" width="75%"> 
 
 ## Schematic
 
-[![Board BOM](./pics/BOM.png)](./KiCad/BOM.csv)
+[![Board Schematic](./pics/schematic.png)](./PCB/schematic.pdf)
 
 ## PCB
 
