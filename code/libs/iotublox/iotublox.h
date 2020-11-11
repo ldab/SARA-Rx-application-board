@@ -55,6 +55,7 @@ typedef struct {
 } socket_t;
 
 typedef struct {
+    bool    registered;
     bool    attach;
     float   RSRP;
     float   RSRQ;
@@ -68,9 +69,10 @@ socket_t socket = {
 };
 
 modemInfo_t modemInfo = {
-              .attach = false,
-              .RSRP   = -32760,
-              .RSRQ   = -32760,
+              .registered = false,
+              .attach     = false,
+              .RSRP       = -32760,
+              .RSRQ       = -32760,
 };
 
 typedef const char* ModemConstStr;
@@ -568,6 +570,10 @@ void sendAT(char* arg)
 * */
 bool iotublox_init(uint8_t mnoProf, char* rat, uint64_t bandMask0, uint64_t bandMask1)
 {
+  // clear modem info after wake-up
+  modemInfo.registered = false;
+  modemInfo.attach     = false;
+
   sendAT("E0");                                                     // Echo Off.
   if (waitResponse(MODEM_TIMEOUT, R_OK) != 1) return false;
   
@@ -762,9 +768,20 @@ bool iotublox_connect(const char* apn)
 
   sendAT("+COPS?");
   unsigned long startMillis = millis();
-  while( waitResponse(MODEM_TIMEOUT, "+COPS: 0,0,") != 1 && millis() - startMillis < 30000L)  // TODO try to connect for 30sec if fails -> sleep.
+  while( millis() - startMillis < 30000L)  // TODO try to connect for 30sec if fails -> sleep.
   {
-    sendAT("+COPS?");
+    if( waitResponse(MODEM_TIMEOUT, "+COPS: 0,0,") == 1 )
+    {
+      modemInfo.registered = true;
+      break;
+    }
+    else
+      sendAT("+COPS?");
+  }
+
+  if( modemInfo.registered == false )
+  {
+    return false;
   }
 
   nrf_delay_ms(100); // breathe
@@ -775,7 +792,8 @@ bool iotublox_connect(const char* apn)
   //if (waitResponse(150000L, R_OK) != 1) return false;
 
   sendAT("+CGATT=1");                                   // GPRS Attach 
-  if (waitResponse(150000L, R_OK) != 1) return false;
+  if (waitResponse(150000L, R_OK) != 1)
+    return false;
   else
     modemInfo.attach = true;
 
@@ -784,7 +802,7 @@ bool iotublox_connect(const char* apn)
 
   rsrp_rsrq();
 
-  return true;
+  return modemInfo.attach;
 }
 
 /**

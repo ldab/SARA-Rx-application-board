@@ -7,6 +7,8 @@
 
 [![GitHub last commit](https://img.shields.io/github/last-commit/ldab/SARA-Rx-application-board.svg?style=social)](https://github.com/ldab/SARA-Rx-application-board)
 
+# **:heavy_exclamation_mark:BEFORE YOU DO ANYTHING, CHECK BATTERY POLARITY:heavy_exclamation_mark:**
+
 ## TODO
 
 - [ ] More details about battery etc...
@@ -18,23 +20,41 @@
 
 ## Energy Budget
 
-* 120mA active current;
-* Code takes 15 seconds to execute;
+* 88mA active current;
+* Code takes ~10 seconds to execute;
 * Wakes every hour;
-* 2mA Sleep current *This needs to be optimized*;
+* 40uA Sleep current;
 * 10 hours of light available;
 * V charge ready = 3.67V;
 * V Over discharge = 3.6V;
 * V Over charge = 4.12V;
 
-**Source Power Required = 34mW**
-**Storage Required = 42.28mAh**
+**Source Power Required = 3.8mW**
+
+**Storage Required = 4.73mAh**
+
+![](./power_profile/exec_time.png)
+
+![](./power_profile/power.png)
+
+### Sleep Current
+
+| Component 	| Current 	|
+|-----------	|---------	|
+| SARA-R410 	| 7uA     	|
+| NINA-B3   	| 3uA     	|
+| Batt ADC  	| 3uA     	|
+| SHTC3     	| 0.5uA   	|
+| TP4054    	| 1uA     	|
+| TXS0108   	| 5uA(?)  	|
+| TPS61021A  	| 17uA   	  |
+| TOTAL     	| ~37uA   	|
 
 ## Nordic SDK
 
 * This is based on nRF5_SDK_16.0.0_98a08e2, get yours here: https://www.nordicsemi.com/Software-and-tools/Software/nRF5-SDK/Download
 
-## Amazon AWS and MQTT
+![](./pics/mqtt_RTT-print.png)
 
 1. Sign in to the AWS IoT Console
 2. Register a Device in the Registry
@@ -43,7 +63,14 @@
 
 https://docs.aws.amazon.com/iot/latest/developerguide/iot-gs.html
 
-## Running the code locally
+* 120mA active current;
+* Code takes 15 seconds to execute;
+* Wakes every hour;
+* 2mA Sleep current *This needs to be optimized*;
+* 10 hours of light available;
+* V charge ready = 3.67V;
+* V Over discharge = 3.6V;
+* V Over charge = 4.12V;
 
 1. Clone this repo to a local folder ```> git clone https://github.com/ldab/SARA-Rx-application-board```
 2. Point the `$(SDK)` @`./code/ninab3/blank/ses/libuarte_pca10056.emProject` to where you have installed Nordic SDK, for example `C:\nRF\nRF5_SDK_16.0.0_98a08e2`
@@ -54,13 +81,36 @@ https://docs.aws.amazon.com/iot/latest/developerguide/iot-gs.html
 
 Ref. https://devzone.nordicsemi.com/f/nordic-q-a/44638/how-to-move-an-sdk-example-out-of-the-sdk-tree
 
+## IoT Dashboard
+
+* Adafruit https://io.adafruit.com provides a free MQTT broker with a Dashboard allowing this project to be displayed publicly with little to no effort
+  * Create an account and insert your KEY as the `MQTT_PASS`
+  * `MQTT_USER` is the username used for creating the account.
+
+* Adafruit expect data as a json, for example:
+
+    ```
+    sprintf(_msg, "{\"feeds\": {\"T\": %.01f,\"H\": %.01f,\"Bpc\": %d,\"RSRP\": %.02f,\"Bv\": %.02f}}",
+            temperature, humidity, batt_lvl_in_percentage, modemInfo.RSRP, _b)
+    ```
+
+* The topic, groups and feeds are created automagically, on the example the MAC address is added as an identifier:
+
+    ```
+    sprintf(topic, "lbispo/g/nina_%X/json", NRF_FICR->DEVICEADDR[0]);
+    ```
+
+<img src="./pics/dashboard.png" width="50%"> 
+
+https://io.adafruit.com/lbispo/dashboards/moree?kiosk=true
+
 ## Efficiency
 
 <img src="./pics/effchart.png" width="75%"> 
 
 ## Schematic
 
-[![Board BOM](./pics/BOM.png)](./KiCad/BOM.csv)
+[![Board Schematic](./pics/schematic.png)](./PCB/schematic.pdf)
 
 ## PCB
 
